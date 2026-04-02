@@ -1,0 +1,28 @@
+﻿name: LightCalorieTimeline
+options:
+  minimumXcodeGenVersion: 2.38.0
+configs:
+  Debug: debug
+  Release: release
+settings:
+  base:
+    SWIFT_VERSION: 5.0
+    PRODUCT_BUNDLE_IDENTIFIER: com.lenovo.LightCalorieTimeline
+    TARGETED_DEVICE_FAMILY: 1,2
+targets:
+  LightCalorieTimeline:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Sources
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: 轻卡小记
+        UILaunchScreen: {}
+        NSPhotoLibraryUsageDescription: 需要访问相册以选择三餐图片
+        NSCameraUsageDescription: 需要访问相机拍摄三餐图片
+    settings:
+      base:
+        INFOPLIST_FILE: Sources/Info.plist

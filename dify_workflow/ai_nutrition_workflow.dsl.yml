@@ -1,0 +1,1784 @@
+{
+  "app": {
+    "description": "上传三餐图片和食物克重，自动计算摄入热量、BMR、TDEE并输出减脂建议",
+    "icon": "bust_in_silhouette",
+    "icon_background": "#FFEAD5",
+    "mode": "workflow",
+    "name": "智能AI营养师-饮食热量管理",
+    "use_icon_as_answer_icon": false
+  },
+  "dependencies": [],
+  "kind": "app",
+  "version": "0.6.0",
+  "workflow": {
+    "conversation_variables": [],
+    "environment_variables": [],
+    "features": {
+      "file_upload": {
+        "enabled": true,
+        "allowed_file_extensions": [
+          ".JPG",
+          ".JPEG",
+          ".PNG",
+          ".GIF",
+          ".WEBP",
+          ".SVG"
+        ],
+        "allowed_file_types": [
+          "image"
+        ],
+        "allowed_file_upload_methods": [
+          "local_file",
+          "remote_url"
+        ],
+        "number_limits": 3,
+        "image": {
+          "enabled": true,
+          "number_limits": 3,
+          "transfer_methods": [
+            "local_file",
+            "remote_url"
+          ]
+        },
+        "fileUploadConfig": {
+          "attachment_image_file_size_limit": 2,
+          "audio_file_size_limit": 50,
+          "batch_count_limit": 5,
+          "file_size_limit": 15,
+          "file_upload_limit": 10,
+          "image_file_batch_limit": 10,
+          "image_file_size_limit": 10,
+          "single_chunk_attachment_limit": 10,
+          "video_file_size_limit": 100,
+          "workflow_file_upload_limit": 10
+        }
+      },
+      "opening_statement": "",
+      "retriever_resource": {
+        "enabled": false
+      },
+      "sensitive_word_avoidance": {
+        "enabled": false
+      },
+      "speech_to_text": {
+        "enabled": false
+      },
+      "suggested_questions": [],
+      "suggested_questions_after_answer": {
+        "enabled": false
+      },
+      "text_to_speech": {
+        "enabled": false,
+        "language": "",
+        "voice": ""
+      }
+    },
+    "graph": {
+      "nodes": [
+        {
+          "id": "1000000000001",
+          "type": "custom",
+          "position": {
+            "x": 30,
+            "y": 280
+          },
+          "positionAbsolute": {
+            "x": 30,
+            "y": 280
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 260,
+          "selected": false,
+          "data": {
+            "title": "用户输入",
+            "type": "start",
+            "desc": "",
+            "selected": false,
+            "variables": [
+              {
+                "label": "身高(cm)",
+                "max_length": 48,
+                "options": [],
+                "required": true,
+                "type": "number",
+                "variable": "height_cm"
+              },
+              {
+                "label": "体重(kg)",
+                "max_length": 48,
+                "options": [],
+                "required": true,
+                "type": "number",
+                "variable": "weight_kg"
+              },
+              {
+                "label": "年龄",
+                "max_length": 48,
+                "options": [],
+                "required": true,
+                "type": "number",
+                "variable": "age"
+              },
+              {
+                "label": "性别",
+                "max_length": 48,
+                "options": [
+                  "男",
+                  "女"
+                ],
+                "required": true,
+                "type": "select",
+                "variable": "gender"
+              },
+              {
+                "label": "活动水平",
+                "max_length": 48,
+                "options": [
+                  "久坐",
+                  "轻量活动",
+                  "中等活动",
+                  "高强度活动",
+                  "极高活动"
+                ],
+                "required": true,
+                "type": "select",
+                "variable": "activity_level"
+              },
+              {
+                "allowed_file_extensions": [
+                  ".JPG",
+                  ".JPEG",
+                  ".PNG",
+                  ".GIF",
+                  ".WEBP"
+                ],
+                "allowed_file_types": [
+                  "image"
+                ],
+                "allowed_file_upload_methods": [
+                  "local_file",
+                  "remote_url"
+                ],
+                "label": "早餐图片",
+                "max_length": 1,
+                "options": [],
+                "required": true,
+                "type": "file-list",
+                "variable": "breakfast_image"
+              },
+              {
+                "allowed_file_extensions": [
+                  ".JPG",
+                  ".JPEG",
+                  ".PNG",
+                  ".GIF",
+                  ".WEBP"
+                ],
+                "allowed_file_types": [
+                  "image"
+                ],
+                "allowed_file_upload_methods": [
+                  "local_file",
+                  "remote_url"
+                ],
+                "label": "午餐图片",
+                "max_length": 1,
+                "options": [],
+                "required": true,
+                "type": "file-list",
+                "variable": "lunch_image"
+              },
+              {
+                "allowed_file_extensions": [
+                  ".JPG",
+                  ".JPEG",
+                  ".PNG",
+                  ".GIF",
+                  ".WEBP"
+                ],
+                "allowed_file_types": [
+                  "image"
+                ],
+                "allowed_file_upload_methods": [
+                  "local_file",
+                  "remote_url"
+                ],
+                "label": "晚餐图片",
+                "max_length": 1,
+                "options": [],
+                "required": true,
+                "type": "file-list",
+                "variable": "dinner_image"
+              },
+              {
+                "label": "早餐食物及克重",
+                "max_length": 2000,
+                "options": [],
+                "required": true,
+                "type": "paragraph",
+                "variable": "breakfast_items"
+              },
+              {
+                "label": "午餐食物及克重",
+                "max_length": 2000,
+                "options": [],
+                "required": true,
+                "type": "paragraph",
+                "variable": "lunch_items"
+              },
+              {
+                "label": "晚餐食物及克重",
+                "max_length": 2000,
+                "options": [],
+                "required": true,
+                "type": "paragraph",
+                "variable": "dinner_items"
+              }
+            ]
+          }
+        },
+        {
+          "id": "1000000000002",
+          "type": "custom",
+          "position": {
+            "x": 330,
+            "y": 280
+          },
+          "positionAbsolute": {
+            "x": 330,
+            "y": 280
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "输入校验与解析",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "import re\n\nACTIVITY_MAP = {\n    \"久坐\": 1.2,\n    \"sedentary\": 1.2,\n    \"轻量活动\": 1.375,\n    \"light\": 1.375,\n    \"中等活动\": 1.55,\n    \"moderate\": 1.55,\n    \"高强度活动\": 1.725,\n    \"active\": 1.725,\n    \"极高活动\": 1.9,\n    \"very_active\": 1.9,\n}\n\nGENDER_MAP = {\n    \"男\": (\"男\", \"male\"),\n    \"male\": (\"男\", \"male\"),\n    \"m\": (\"男\", \"male\"),\n    \"女\": (\"女\", \"female\"),\n    \"female\": (\"女\", \"female\"),\n    \"f\": (\"女\", \"female\"),\n}\n\n\ndef _to_float(value):\n    try:\n        return float(str(value).strip())\n    except Exception:\n        return None\n\n\ndef _has_file_input(value):\n    if value is None:\n        return False\n    if isinstance(value, list):\n        return len(value) > 0\n    if isinstance(value, dict):\n        return True\n    text = str(value).strip()\n    return text != \"\"\n\n\ndef _clean_name(name):\n    cleaned = re.sub(r\"[()（）\\[\\]【】:：]+\", \"\", str(name)).strip()\n    cleaned = re.sub(r\"\\s+\", \"\", cleaned)\n    return cleaned\n\n\ndef parse_meal_text(text):\n    if text is None:\n        return []\n\n    raw = str(text)\n    normalized = (\n        raw.replace(\"，\", \",\")\n        .replace(\"；\", \";\")\n        .replace(\"、\", \",\")\n        .replace(\"。\", \",\")\n        .replace(\"\\t\", \" \")\n    )\n\n    parts = [p.strip() for p in re.split(r\"[,;\\n]+\", normalized) if p.strip()]\n    items = []\n\n    for part in parts:\n        match_1 = re.search(r\"^([^\\d]+?)\\s*(\\d+(?:\\.\\d+)?)\\s*(?:g|G|克)?$\", part)\n        match_2 = re.search(r\"^(\\d+(?:\\.\\d+)?)\\s*(?:g|G|克)\\s*([^\\d]+)$\", part)\n\n        if match_1:\n            name = _clean_name(match_1.group(1))\n            grams = _to_float(match_1.group(2))\n        elif match_2:\n            name = _clean_name(match_2.group(2))\n            grams = _to_float(match_2.group(1))\n        else:\n            continue\n\n        if not name or grams is None:\n            continue\n        if grams <= 0 or grams > 3000:\n            continue\n\n        items.append({\"name\": name, \"grams\": round(grams, 1), \"estimated\": False})\n\n    merged = {}\n    for item in items:\n        key = item[\"name\"]\n        if key not in merged:\n            merged[key] = {\"name\": key, \"grams\": 0.0, \"estimated\": False}\n        merged[key][\"grams\"] += item[\"grams\"]\n\n    return [{\"name\": v[\"name\"], \"grams\": round(v[\"grams\"], 1), \"estimated\": False} for v in merged.values()]\n\n\ndef main(**args):\n    height = _to_float(args.get(\"height_cm\"))\n    weight = _to_float(args.get(\"weight_kg\"))\n    age = _to_float(args.get(\"age\"))\n\n    gender_raw = str(args.get(\"gender\", \"\")).strip().lower()\n    activity_raw = str(args.get(\"activity_level\", \"\")).strip().lower()\n\n    gender_cn, gender_en = GENDER_MAP.get(gender_raw, (\"\", \"\"))\n    activity_factor = ACTIVITY_MAP.get(activity_raw)\n\n    breakfast = parse_meal_text(args.get(\"breakfast_items\", \"\"))\n    lunch = parse_meal_text(args.get(\"lunch_items\", \"\"))\n    dinner = parse_meal_text(args.get(\"dinner_items\", \"\"))\n    breakfast_image = args.get(\"breakfast_image\")\n    lunch_image = args.get(\"lunch_image\")\n    dinner_image = args.get(\"dinner_image\")\n\n    errors = []\n    if height is None or not (120 <= height <= 230):\n        errors.append(\"身高请输入 120-230 cm 的数字\")\n    if weight is None or not (25 <= weight <= 300):\n        errors.append(\"体重请输入 25-300 kg 的数字\")\n    if age is None or not (10 <= age <= 100):\n        errors.append(\"年龄请输入 10-100 岁的数字\")\n    if not gender_en:\n        errors.append(\"性别请输入 男/女\")\n    if activity_factor is None:\n        errors.append(\"活动水平无效，请从预设选项选择\")\n    if not _has_file_input(breakfast_image):\n        errors.append(\"请上传早餐图片\")\n    if not _has_file_input(lunch_image):\n        errors.append(\"请上传午餐图片\")\n    if not _has_file_input(dinner_image):\n        errors.append(\"请上传晚餐图片\")\n    if not (breakfast or lunch or dinner):\n        errors.append(\"请至少输入一餐食物及克重\")\n\n    return {\n        \"valid\": len(errors) == 0,\n        \"valid_flag\": \"true\" if len(errors) == 0 else \"false\",\n        \"error_msg\": \"；\".join(errors),\n        \"height_cm\": round(height, 1) if height is not None else None,\n        \"weight_kg\": round(weight, 1) if weight is not None else None,\n        \"age\": int(age) if age is not None else None,\n        \"gender_cn\": gender_cn,\n        \"gender_en\": gender_en,\n        \"activity_factor\": activity_factor,\n        \"breakfast_user_items\": breakfast,\n        \"lunch_user_items\": lunch,\n        \"dinner_user_items\": dinner,\n    }\n",
+            "variables": [
+              {
+                "variable": "height_cm",
+                "value_selector": [
+                  "1000000000001",
+                  "height_cm"
+                ]
+              },
+              {
+                "variable": "weight_kg",
+                "value_selector": [
+                  "1000000000001",
+                  "weight_kg"
+                ]
+              },
+              {
+                "variable": "age",
+                "value_selector": [
+                  "1000000000001",
+                  "age"
+                ]
+              },
+              {
+                "variable": "gender",
+                "value_selector": [
+                  "1000000000001",
+                  "gender"
+                ]
+              },
+              {
+                "variable": "activity_level",
+                "value_selector": [
+                  "1000000000001",
+                  "activity_level"
+                ]
+              },
+              {
+                "variable": "breakfast_image",
+                "value_selector": [
+                  "1000000000001",
+                  "breakfast_image"
+                ]
+              },
+              {
+                "variable": "lunch_image",
+                "value_selector": [
+                  "1000000000001",
+                  "lunch_image"
+                ]
+              },
+              {
+                "variable": "dinner_image",
+                "value_selector": [
+                  "1000000000001",
+                  "dinner_image"
+                ]
+              },
+              {
+                "variable": "breakfast_items",
+                "value_selector": [
+                  "1000000000001",
+                  "breakfast_items"
+                ]
+              },
+              {
+                "variable": "lunch_items",
+                "value_selector": [
+                  "1000000000001",
+                  "lunch_items"
+                ]
+              },
+              {
+                "variable": "dinner_items",
+                "value_selector": [
+                  "1000000000001",
+                  "dinner_items"
+                ]
+              }
+            ],
+            "outputs": {
+              "valid": {
+                "children": null,
+                "type": "boolean"
+              },
+              "valid_flag": {
+                "children": null,
+                "type": "string"
+              },
+              "error_msg": {
+                "children": null,
+                "type": "string"
+              },
+              "height_cm": {
+                "children": null,
+                "type": "number"
+              },
+              "weight_kg": {
+                "children": null,
+                "type": "number"
+              },
+              "age": {
+                "children": null,
+                "type": "number"
+              },
+              "gender_cn": {
+                "children": null,
+                "type": "string"
+              },
+              "gender_en": {
+                "children": null,
+                "type": "string"
+              },
+              "activity_factor": {
+                "children": null,
+                "type": "number"
+              },
+              "breakfast_user_items": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "lunch_user_items": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "dinner_user_items": {
+                "children": null,
+                "type": "array[object]"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000003",
+          "type": "custom",
+          "position": {
+            "x": 620,
+            "y": 280
+          },
+          "positionAbsolute": {
+            "x": 620,
+            "y": 280
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 140,
+          "selected": false,
+          "data": {
+            "title": "参数是否有效",
+            "type": "if-else",
+            "desc": "",
+            "selected": false,
+            "cases": [
+              {
+                "case_id": "true",
+                "id": "true",
+                "logical_operator": "and",
+                "conditions": [
+                  {
+                    "id": "cond-valid-001",
+                    "variable_selector": [
+                      "1000000000002",
+                      "valid_flag"
+                    ],
+                    "comparison_operator": "is",
+                    "value": "true",
+                    "varType": "string"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "1000000000004",
+          "type": "custom",
+          "position": {
+            "x": 910,
+            "y": 90
+          },
+          "positionAbsolute": {
+            "x": 910,
+            "y": 90
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "参数错误输出模板",
+            "type": "template-transform",
+            "desc": "",
+            "selected": false,
+            "variables": [
+              {
+                "variable": "height_cm",
+                "value_selector": [
+                  "1000000000001",
+                  "height_cm"
+                ]
+              },
+              {
+                "variable": "weight_kg",
+                "value_selector": [
+                  "1000000000001",
+                  "weight_kg"
+                ]
+              },
+              {
+                "variable": "age",
+                "value_selector": [
+                  "1000000000001",
+                  "age"
+                ]
+              },
+              {
+                "variable": "gender",
+                "value_selector": [
+                  "1000000000001",
+                  "gender"
+                ]
+              },
+              {
+                "variable": "breakfast_items",
+                "value_selector": [
+                  "1000000000001",
+                  "breakfast_items"
+                ]
+              },
+              {
+                "variable": "lunch_items",
+                "value_selector": [
+                  "1000000000001",
+                  "lunch_items"
+                ]
+              },
+              {
+                "variable": "dinner_items",
+                "value_selector": [
+                  "1000000000001",
+                  "dinner_items"
+                ]
+              },
+              {
+                "variable": "error_msg",
+                "value_selector": [
+                  "1000000000002",
+                  "error_msg"
+                ]
+              }
+            ],
+            "template": "【基础信息】\\n身高：{{ height_cm }}\\n体重：{{ weight_kg }}\\n年龄：{{ age }}\\n性别：{{ gender }}\\n每日所需热量（TDEE）：无法计算\\n\\n【今日饮食记录】\\n早餐：{{ breakfast_items }}\\n午餐：{{ lunch_items }}\\n晚餐：{{ dinner_items }}\\n今日总摄入：无法计算\\n\\n【热量对比】\\n摄入 vs 所需：无法计算\\n差额：无法计算\\n结论：输入信息不完整或格式错误\\n\\n【建议】\\n请先修正输入：{{ error_msg }}"
+          }
+        },
+        {
+          "id": "1000000000005",
+          "type": "custom",
+          "position": {
+            "x": 1200,
+            "y": 90
+          },
+          "positionAbsolute": {
+            "x": 1200,
+            "y": 90
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 88,
+          "selected": false,
+          "data": {
+            "title": "错误结束",
+            "type": "end",
+            "desc": "",
+            "selected": false,
+            "outputs": [
+              {
+                "variable": "report",
+                "value_type": "string",
+                "value_selector": [
+                  "1000000000004",
+                  "output"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "id": "1000000000006",
+          "type": "custom",
+          "position": {
+            "x": 910,
+            "y": 280
+          },
+          "positionAbsolute": {
+            "x": 910,
+            "y": 280
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 92,
+          "selected": false,
+          "data": {
+            "title": "筛选早餐图片",
+            "type": "list-operator",
+            "desc": "",
+            "selected": false,
+            "var_type": "array[file]",
+            "item_var_type": "file",
+            "variable": [
+              "1000000000001",
+              "breakfast_image"
+            ],
+            "filter_by": {
+              "enabled": true,
+              "conditions": [
+                {
+                  "comparison_operator": "in",
+                  "key": "type",
+                  "value": [
+                    "image"
+                  ]
+                }
+              ]
+            },
+            "limit": {
+              "enabled": true,
+              "size": 1
+            },
+            "order_by": {
+              "enabled": false,
+              "key": "",
+              "value": "asc"
+            }
+          }
+        },
+        {
+          "id": "1000000000007",
+          "type": "custom",
+          "position": {
+            "x": 910,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 910,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 92,
+          "selected": false,
+          "data": {
+            "title": "筛选午餐图片",
+            "type": "list-operator",
+            "desc": "",
+            "selected": false,
+            "var_type": "array[file]",
+            "item_var_type": "file",
+            "variable": [
+              "1000000000001",
+              "lunch_image"
+            ],
+            "filter_by": {
+              "enabled": true,
+              "conditions": [
+                {
+                  "comparison_operator": "in",
+                  "key": "type",
+                  "value": [
+                    "image"
+                  ]
+                }
+              ]
+            },
+            "limit": {
+              "enabled": true,
+              "size": 1
+            },
+            "order_by": {
+              "enabled": false,
+              "key": "",
+              "value": "asc"
+            }
+          }
+        },
+        {
+          "id": "1000000000008",
+          "type": "custom",
+          "position": {
+            "x": 910,
+            "y": 580
+          },
+          "positionAbsolute": {
+            "x": 910,
+            "y": 580
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 92,
+          "selected": false,
+          "data": {
+            "title": "筛选晚餐图片",
+            "type": "list-operator",
+            "desc": "",
+            "selected": false,
+            "var_type": "array[file]",
+            "item_var_type": "file",
+            "variable": [
+              "1000000000001",
+              "dinner_image"
+            ],
+            "filter_by": {
+              "enabled": true,
+              "conditions": [
+                {
+                  "comparison_operator": "in",
+                  "key": "type",
+                  "value": [
+                    "image"
+                  ]
+                }
+              ]
+            },
+            "limit": {
+              "enabled": true,
+              "size": 1
+            },
+            "order_by": {
+              "enabled": false,
+              "key": "",
+              "value": "asc"
+            }
+          }
+        },
+        {
+          "id": "1000000000009",
+          "type": "custom",
+          "position": {
+            "x": 1210,
+            "y": 280
+          },
+          "positionAbsolute": {
+            "x": 1210,
+            "y": 280
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 118,
+          "selected": false,
+          "data": {
+            "title": "早餐图片识别",
+            "type": "llm",
+            "desc": "",
+            "selected": false,
+            "context": {
+              "enabled": false,
+              "variable_selector": []
+            },
+            "memory": {
+              "query_prompt_template": "",
+              "role_prefix": {
+                "assistant": "",
+                "user": ""
+              },
+              "window": {
+                "enabled": false,
+                "size": 10
+              }
+            },
+            "model": {
+              "provider": "langgenius/openai/openai",
+              "name": "gpt-4o-mini",
+              "mode": "chat",
+              "completion_params": {
+                "temperature": 0.1
+              }
+            },
+            "prompt_template": [
+              {
+                "role": "system",
+                "text": "You are a food detector. Identify main foods in the image.\\nOutput rules:\\n1) Return JSON only, no explanation.\\n2) Strict format: {\"foods\":[\"food1\",\"food2\"]}\\n3) Do not estimate weight or calories.\\n4) Keep foods concise."
+              },
+              {
+                "role": "user",
+                "text": "Identify foods from this meal image and return JSON."
+              }
+            ],
+            "variables": [],
+            "vision": {
+              "enabled": true,
+              "configs": {
+                "detail": "high",
+                "variable_selector": [
+                  "1000000000006",
+                  "result"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000010",
+          "type": "custom",
+          "position": {
+            "x": 1210,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 1210,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 118,
+          "selected": false,
+          "data": {
+            "title": "午餐图片识别",
+            "type": "llm",
+            "desc": "",
+            "selected": false,
+            "context": {
+              "enabled": false,
+              "variable_selector": []
+            },
+            "memory": {
+              "query_prompt_template": "",
+              "role_prefix": {
+                "assistant": "",
+                "user": ""
+              },
+              "window": {
+                "enabled": false,
+                "size": 10
+              }
+            },
+            "model": {
+              "provider": "langgenius/openai/openai",
+              "name": "gpt-4o-mini",
+              "mode": "chat",
+              "completion_params": {
+                "temperature": 0.1
+              }
+            },
+            "prompt_template": [
+              {
+                "role": "system",
+                "text": "You are a food detector. Identify main foods in the image.\\nOutput rules:\\n1) Return JSON only, no explanation.\\n2) Strict format: {\"foods\":[\"food1\",\"food2\"]}\\n3) Do not estimate weight or calories.\\n4) Keep foods concise."
+              },
+              {
+                "role": "user",
+                "text": "Identify foods from this meal image and return JSON."
+              }
+            ],
+            "variables": [],
+            "vision": {
+              "enabled": true,
+              "configs": {
+                "detail": "high",
+                "variable_selector": [
+                  "1000000000007",
+                  "result"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000011",
+          "type": "custom",
+          "position": {
+            "x": 1210,
+            "y": 580
+          },
+          "positionAbsolute": {
+            "x": 1210,
+            "y": 580
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 118,
+          "selected": false,
+          "data": {
+            "title": "晚餐图片识别",
+            "type": "llm",
+            "desc": "",
+            "selected": false,
+            "context": {
+              "enabled": false,
+              "variable_selector": []
+            },
+            "memory": {
+              "query_prompt_template": "",
+              "role_prefix": {
+                "assistant": "",
+                "user": ""
+              },
+              "window": {
+                "enabled": false,
+                "size": 10
+              }
+            },
+            "model": {
+              "provider": "langgenius/openai/openai",
+              "name": "gpt-4o-mini",
+              "mode": "chat",
+              "completion_params": {
+                "temperature": 0.1
+              }
+            },
+            "prompt_template": [
+              {
+                "role": "system",
+                "text": "You are a food detector. Identify main foods in the image.\\nOutput rules:\\n1) Return JSON only, no explanation.\\n2) Strict format: {\"foods\":[\"food1\",\"food2\"]}\\n3) Do not estimate weight or calories.\\n4) Keep foods concise."
+              },
+              {
+                "role": "user",
+                "text": "Identify foods from this meal image and return JSON."
+              }
+            ],
+            "variables": [],
+            "vision": {
+              "enabled": true,
+              "configs": {
+                "detail": "high",
+                "variable_selector": [
+                  "1000000000008",
+                  "result"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000012",
+          "type": "custom",
+          "position": {
+            "x": 1510,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 1510,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "食物合并标准化",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "import json\nimport re\n\n\ndef parse_vision_foods(raw_text):\n    if raw_text is None:\n        return []\n\n    if isinstance(raw_text, dict):\n        foods = raw_text.get(\"foods\", [])\n        return [str(x).strip() for x in foods if str(x).strip()]\n\n    text = str(raw_text).strip()\n    if not text:\n        return []\n\n    try:\n        data = json.loads(text)\n        foods = data.get(\"foods\", []) if isinstance(data, dict) else []\n        return [str(x).strip() for x in foods if str(x).strip()]\n    except Exception:\n        pass\n\n    block = re.search(r\"\\{[\\s\\S]*\\}\", text)\n    if block:\n        try:\n            data = json.loads(block.group(0))\n            foods = data.get(\"foods\", []) if isinstance(data, dict) else []\n            return [str(x).strip() for x in foods if str(x).strip()]\n        except Exception:\n            pass\n\n    fallback = re.split(r\"[,，、;；\\n]+\", text)\n    return [x.strip() for x in fallback if x.strip()]\n\n\ndef merge_meal(user_items, vision_foods):\n    user_items = user_items or []\n    vision_foods = vision_foods or []\n\n    if user_items:\n        merged = {}\n        for item in user_items:\n            name = str(item.get(\"name\", \"\")).strip()\n            grams = float(item.get(\"grams\", 0) or 0)\n            if not name or grams <= 0:\n                continue\n            if name not in merged:\n                merged[name] = {\"name\": name, \"grams\": 0.0, \"estimated\": False}\n            merged[name][\"grams\"] += grams\n        return [{\"name\": v[\"name\"], \"grams\": round(v[\"grams\"], 1), \"estimated\": False} for v in merged.values()]\n\n    if vision_foods:\n        dedup = []\n        seen = set()\n        for food in vision_foods:\n            name = str(food).strip()\n            if not name or name in seen:\n                continue\n            seen.add(name)\n            dedup.append({\"name\": name, \"grams\": 100.0, \"estimated\": True})\n        return dedup\n\n    return []\n\n\ndef main(**args):\n    breakfast_user = args.get(\"breakfast_user_items\") or []\n    lunch_user = args.get(\"lunch_user_items\") or []\n    dinner_user = args.get(\"dinner_user_items\") or []\n\n    breakfast_vision = parse_vision_foods(args.get(\"breakfast_vision_text\", \"\"))\n    lunch_vision = parse_vision_foods(args.get(\"lunch_vision_text\", \"\"))\n    dinner_vision = parse_vision_foods(args.get(\"dinner_vision_text\", \"\"))\n\n    breakfast_final = merge_meal(breakfast_user, breakfast_vision)\n    lunch_final = merge_meal(lunch_user, lunch_vision)\n    dinner_final = merge_meal(dinner_user, dinner_vision)\n\n    return {\n        \"breakfast_final_items\": breakfast_final,\n        \"lunch_final_items\": lunch_final,\n        \"dinner_final_items\": dinner_final,\n    }\n",
+            "variables": [
+              {
+                "variable": "breakfast_user_items",
+                "value_selector": [
+                  "1000000000002",
+                  "breakfast_user_items"
+                ]
+              },
+              {
+                "variable": "lunch_user_items",
+                "value_selector": [
+                  "1000000000002",
+                  "lunch_user_items"
+                ]
+              },
+              {
+                "variable": "dinner_user_items",
+                "value_selector": [
+                  "1000000000002",
+                  "dinner_user_items"
+                ]
+              },
+              {
+                "variable": "breakfast_vision_text",
+                "value_selector": [
+                  "1000000000009",
+                  "text"
+                ]
+              },
+              {
+                "variable": "lunch_vision_text",
+                "value_selector": [
+                  "1000000000010",
+                  "text"
+                ]
+              },
+              {
+                "variable": "dinner_vision_text",
+                "value_selector": [
+                  "1000000000011",
+                  "text"
+                ]
+              }
+            ],
+            "outputs": {
+              "breakfast_final_items": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "lunch_final_items": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "dinner_final_items": {
+                "children": null,
+                "type": "array[object]"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000013",
+          "type": "custom",
+          "position": {
+            "x": 1810,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 1810,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "热量计算",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "CALORIE_PER_100G = {\n    \"米饭\": 116,\n    \"面条\": 137,\n    \"馒头\": 223,\n    \"面包\": 265,\n    \"燕麦\": 389,\n    \"鸡蛋\": 144,\n    \"鸡胸肉\": 165,\n    \"鸡腿肉\": 215,\n    \"牛肉\": 250,\n    \"瘦猪肉\": 143,\n    \"猪肉\": 250,\n    \"鱼肉\": 130,\n    \"三文鱼\": 208,\n    \"虾\": 99,\n    \"豆腐\": 81,\n    \"豆浆\": 31,\n    \"牛奶\": 54,\n    \"酸奶\": 72,\n    \"奶酪\": 328,\n    \"西兰花\": 34,\n    \"菠菜\": 24,\n    \"生菜\": 15,\n    \"黄瓜\": 16,\n    \"番茄\": 18,\n    \"土豆\": 77,\n    \"红薯\": 86,\n    \"玉米\": 96,\n    \"苹果\": 53,\n    \"香蕉\": 93,\n    \"橙子\": 47,\n    \"葡萄\": 45,\n    \"坚果\": 600,\n    \"花生\": 567,\n    \"核桃\": 654,\n    \"薯片\": 536,\n    \"炸鸡\": 260,\n    \"汉堡\": 250,\n    \"披萨\": 266,\n    \"香肠\": 300,\n    \"火腿\": 212,\n    \"方便面\": 470,\n    \"蛋炒饭\": 180,\n    \"炒面\": 170,\n    \"麻婆豆腐\": 140,\n    \"宫保鸡丁\": 190,\n    \"红烧肉\": 350,\n    \"青菜\": 25,\n    \"白粥\": 46,\n    \"奶茶\": 80,\n    \"可乐\": 43,\n    \"果汁\": 45,\n}\n\nALIASES = [\n    (\"鸡胸\", \"鸡胸肉\"),\n    (\"鸡蛋\", \"鸡蛋\"),\n    (\"水煮蛋\", \"鸡蛋\"),\n    (\"米饭\", \"米饭\"),\n    (\"白米饭\", \"米饭\"),\n    (\"牛奶\", \"牛奶\"),\n    (\"酸奶\", \"酸奶\"),\n    (\"豆腐\", \"豆腐\"),\n    (\"豆浆\", \"豆浆\"),\n    (\"鸡腿\", \"鸡腿肉\"),\n    (\"瘦肉\", \"瘦猪肉\"),\n    (\"猪肉\", \"猪肉\"),\n    (\"牛肉\", \"牛肉\"),\n    (\"鱼\", \"鱼肉\"),\n    (\"三文鱼\", \"三文鱼\"),\n    (\"虾\", \"虾\"),\n    (\"青菜\", \"青菜\"),\n    (\"西兰花\", \"西兰花\"),\n    (\"生菜\", \"生菜\"),\n    (\"黄瓜\", \"黄瓜\"),\n    (\"番茄\", \"番茄\"),\n    (\"西红柿\", \"番茄\"),\n    (\"土豆\", \"土豆\"),\n    (\"红薯\", \"红薯\"),\n    (\"地瓜\", \"红薯\"),\n    (\"苹果\", \"苹果\"),\n    (\"香蕉\", \"香蕉\"),\n    (\"橙\", \"橙子\"),\n    (\"面条\", \"面条\"),\n    (\"炒面\", \"炒面\"),\n    (\"馒头\", \"馒头\"),\n    (\"面包\", \"面包\"),\n    (\"燕麦\", \"燕麦\"),\n    (\"白粥\", \"白粥\"),\n    (\"粥\", \"白粥\"),\n    (\"奶茶\", \"奶茶\"),\n    (\"可乐\", \"可乐\"),\n    (\"果汁\", \"果汁\"),\n    (\"坚果\", \"坚果\"),\n    (\"花生\", \"花生\"),\n    (\"核桃\", \"核桃\"),\n    (\"薯片\", \"薯片\"),\n    (\"炸鸡\", \"炸鸡\"),\n    (\"汉堡\", \"汉堡\"),\n    (\"披萨\", \"披萨\"),\n    (\"香肠\", \"香肠\"),\n    (\"火腿\", \"火腿\"),\n    (\"方便面\", \"方便面\"),\n    (\"蛋炒饭\", \"蛋炒饭\"),\n    (\"麻婆豆腐\", \"麻婆豆腐\"),\n    (\"宫保鸡丁\", \"宫保鸡丁\"),\n    (\"红烧肉\", \"红烧肉\"),\n    (\"egg\", \"鸡蛋\"),\n    (\"milk\", \"牛奶\"),\n    (\"yogurt\", \"酸奶\"),\n    (\"tofu\", \"豆腐\"),\n    (\"soy milk\", \"豆浆\"),\n    (\"rice\", \"米饭\"),\n    (\"bread\", \"面包\"),\n    (\"oat\", \"燕麦\"),\n    (\"chicken breast\", \"鸡胸肉\"),\n    (\"chicken\", \"鸡腿肉\"),\n    (\"beef\", \"牛肉\"),\n    (\"pork\", \"猪肉\"),\n    (\"fish\", \"鱼肉\"),\n    (\"salmon\", \"三文鱼\"),\n    (\"shrimp\", \"虾\"),\n    (\"broccoli\", \"西兰花\"),\n    (\"spinach\", \"菠菜\"),\n    (\"lettuce\", \"生菜\"),\n    (\"cucumber\", \"黄瓜\"),\n    (\"tomato\", \"番茄\"),\n    (\"potato\", \"土豆\"),\n    (\"sweet potato\", \"红薯\"),\n    (\"apple\", \"苹果\"),\n    (\"banana\", \"香蕉\"),\n    (\"orange\", \"橙子\"),\n    (\"juice\", \"果汁\"),\n    (\"cola\", \"可乐\"),\n    (\"burger\", \"汉堡\"),\n    (\"pizza\", \"披萨\"),\n    (\"sausage\", \"香肠\"),\n]\n\nDEFAULT_KCAL_100G = 150\n\n\ndef _to_float(v, default=0.0):\n    try:\n        return float(v)\n    except Exception:\n        return default\n\n\ndef _fmt_grams(grams):\n    if abs(grams - int(grams)) < 1e-9:\n        return str(int(grams))\n    return f\"{grams:.1f}\"\n\n\ndef _lookup_kcal(food_name):\n    name = str(food_name or \"\").strip()\n    if not name:\n        return \"未知食物\", DEFAULT_KCAL_100G, False\n\n    if name in CALORIE_PER_100G:\n        return name, CALORIE_PER_100G[name], True\n\n    for alias, canonical in ALIASES:\n        if alias in name:\n            return canonical, CALORIE_PER_100G[canonical], True\n\n    for canonical, kcal in CALORIE_PER_100G.items():\n        if canonical in name:\n            return canonical, kcal, True\n\n    return name, DEFAULT_KCAL_100G, False\n\n\ndef calc_meal(items):\n    result_items = []\n    total = 0\n\n    for item in items or []:\n        raw_name = str(item.get(\"name\", \"\")).strip()\n        grams = _to_float(item.get(\"grams\", 0), 0.0)\n        estimated = bool(item.get(\"estimated\", False))\n        if not raw_name or grams <= 0:\n            continue\n\n        canonical, kcal_100g, matched = _lookup_kcal(raw_name)\n        kcal = int(round(grams * kcal_100g / 100.0))\n        total += kcal\n\n        result_items.append(\n            {\n                \"name\": raw_name,\n                \"canonical_name\": canonical,\n                \"grams\": round(grams, 1),\n                \"kcal_per_100g\": kcal_100g,\n                \"kcal\": kcal,\n                \"estimated\": estimated,\n                \"matched_db\": matched,\n            }\n        )\n\n    if not result_items:\n        summary = \"无\"\n    else:\n        parts = []\n        for x in result_items:\n            est_tag = \"(估)\" if x[\"estimated\"] else \"\"\n            parts.append(f\"{x['name']}{_fmt_grams(x['grams'])}g({x['kcal']} kcal){est_tag}\")\n        summary = \"、\".join(parts)\n\n    return result_items, total, summary\n\n\ndef main(**args):\n    breakfast_items, breakfast_total, breakfast_summary = calc_meal(args.get(\"breakfast_final_items\") or [])\n    lunch_items, lunch_total, lunch_summary = calc_meal(args.get(\"lunch_final_items\") or [])\n    dinner_items, dinner_total, dinner_summary = calc_meal(args.get(\"dinner_final_items\") or [])\n\n    intake_total = int(breakfast_total + lunch_total + dinner_total)\n\n    return {\n        \"breakfast_items_detail\": breakfast_items,\n        \"lunch_items_detail\": lunch_items,\n        \"dinner_items_detail\": dinner_items,\n        \"breakfast_kcal\": int(breakfast_total),\n        \"lunch_kcal\": int(lunch_total),\n        \"dinner_kcal\": int(dinner_total),\n        \"breakfast_summary\": breakfast_summary,\n        \"lunch_summary\": lunch_summary,\n        \"dinner_summary\": dinner_summary,\n        \"intake_total\": intake_total,\n    }\n",
+            "variables": [
+              {
+                "variable": "breakfast_final_items",
+                "value_selector": [
+                  "1000000000012",
+                  "breakfast_final_items"
+                ]
+              },
+              {
+                "variable": "lunch_final_items",
+                "value_selector": [
+                  "1000000000012",
+                  "lunch_final_items"
+                ]
+              },
+              {
+                "variable": "dinner_final_items",
+                "value_selector": [
+                  "1000000000012",
+                  "dinner_final_items"
+                ]
+              }
+            ],
+            "outputs": {
+              "breakfast_items_detail": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "lunch_items_detail": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "dinner_items_detail": {
+                "children": null,
+                "type": "array[object]"
+              },
+              "breakfast_kcal": {
+                "children": null,
+                "type": "number"
+              },
+              "lunch_kcal": {
+                "children": null,
+                "type": "number"
+              },
+              "dinner_kcal": {
+                "children": null,
+                "type": "number"
+              },
+              "breakfast_summary": {
+                "children": null,
+                "type": "string"
+              },
+              "lunch_summary": {
+                "children": null,
+                "type": "string"
+              },
+              "dinner_summary": {
+                "children": null,
+                "type": "string"
+              },
+              "intake_total": {
+                "children": null,
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000014",
+          "type": "custom",
+          "position": {
+            "x": 1810,
+            "y": 580
+          },
+          "positionAbsolute": {
+            "x": 1810,
+            "y": 580
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "BMR_TDEE计算",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "def _to_float(v, default=0.0):\n    try:\n        return float(v)\n    except Exception:\n        return default\n\n\ndef main(**args):\n    height_cm = _to_float(args.get(\"height_cm\"), 0.0)\n    weight_kg = _to_float(args.get(\"weight_kg\"), 0.0)\n    age = _to_float(args.get(\"age\"), 0.0)\n    gender_en = str(args.get(\"gender_en\", \"\")).strip().lower()\n    activity_factor = _to_float(args.get(\"activity_factor\"), 1.2)\n\n    if gender_en == \"male\":\n        bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age + 5\n    else:\n        bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age - 161\n\n    tdee = bmr * activity_factor\n\n    return {\n        \"bmr\": int(round(bmr)),\n        \"tdee\": int(round(tdee)),\n    }\n",
+            "variables": [
+              {
+                "variable": "height_cm",
+                "value_selector": [
+                  "1000000000002",
+                  "height_cm"
+                ]
+              },
+              {
+                "variable": "weight_kg",
+                "value_selector": [
+                  "1000000000002",
+                  "weight_kg"
+                ]
+              },
+              {
+                "variable": "age",
+                "value_selector": [
+                  "1000000000002",
+                  "age"
+                ]
+              },
+              {
+                "variable": "gender_en",
+                "value_selector": [
+                  "1000000000002",
+                  "gender_en"
+                ]
+              },
+              {
+                "variable": "activity_factor",
+                "value_selector": [
+                  "1000000000002",
+                  "activity_factor"
+                ]
+              }
+            ],
+            "outputs": {
+              "bmr": {
+                "children": null,
+                "type": "number"
+              },
+              "tdee": {
+                "children": null,
+                "type": "number"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000015",
+          "type": "custom",
+          "position": {
+            "x": 2110,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 2110,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "热量对比",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "def _to_int(v, default=0):\n    try:\n        return int(round(float(v)))\n    except Exception:\n        return default\n\n\ndef main(**args):\n    intake_total = _to_int(args.get(\"intake_total\"), 0)\n    tdee = _to_int(args.get(\"tdee\"), 0)\n    delta = intake_total - tdee\n\n    if delta > 200:\n        conclusion = \"摄入超标（热量盈余）\"\n    elif delta < -200:\n        conclusion = \"摄入不足（热量缺口较大）\"\n    else:\n        conclusion = \"摄入基本匹配（接近维持）\"\n\n    delta_text = f\"{delta:+d} kcal\"\n\n    return {\n        \"intake_vs_need\": f\"{intake_total} vs {tdee} kcal\",\n        \"delta\": delta,\n        \"delta_text\": delta_text,\n        \"conclusion\": conclusion,\n    }\n",
+            "variables": [
+              {
+                "variable": "intake_total",
+                "value_selector": [
+                  "1000000000013",
+                  "intake_total"
+                ]
+              },
+              {
+                "variable": "tdee",
+                "value_selector": [
+                  "1000000000014",
+                  "tdee"
+                ]
+              }
+            ],
+            "outputs": {
+              "intake_vs_need": {
+                "children": null,
+                "type": "string"
+              },
+              "delta": {
+                "children": null,
+                "type": "number"
+              },
+              "delta_text": {
+                "children": null,
+                "type": "string"
+              },
+              "conclusion": {
+                "children": null,
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000016",
+          "type": "custom",
+          "position": {
+            "x": 2410,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 2410,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "建议生成",
+            "type": "code",
+            "desc": "",
+            "selected": false,
+            "code_language": "python3",
+            "code": "def _to_int(v, default=0):\n    try:\n        return int(round(float(v)))\n    except Exception:\n        return default\n\n\ndef main(**args):\n    delta = _to_int(args.get(\"delta\"), 0)\n\n    common = \"保持每日饮水 1.5-2L，晚餐后安排 20-30 分钟轻快步行。\"\n\n    if delta > 200:\n        lines = [\n            \"晚餐主食先减 1/4（如米饭少 50-75g），优先保证蔬菜和蛋白质。\",\n            \"高油高糖加餐（奶茶、甜点、油炸）改为每周 1-2 次，平日用无糖饮品替代。\",\n            common,\n        ]\n    elif delta < -200:\n        lines = [\n            \"当前热量缺口偏大，建议每餐补一点优质主食（如米饭/全麦/土豆）。\",\n            \"蛋白质可提高到每餐 1 掌心（鸡蛋、鱼虾、瘦肉、豆制品），减少肌肉流失风险。\",\n            common,\n        ]\n    else:\n        lines = [\n            \"当前热量控制较稳，继续保持三餐规律和固定进餐时间。\",\n            \"每餐维持“半盘蔬菜+掌心蛋白+适量主食”的结构，便于长期坚持。\",\n            common,\n        ]\n\n    return {\n        \"advice\": \"\\n\".join(lines)\n    }\n",
+            "variables": [
+              {
+                "variable": "delta",
+                "value_selector": [
+                  "1000000000015",
+                  "delta"
+                ]
+              }
+            ],
+            "outputs": {
+              "advice": {
+                "children": null,
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "id": "1000000000017",
+          "type": "custom",
+          "position": {
+            "x": 2710,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 2710,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 86,
+          "selected": false,
+          "data": {
+            "title": "严格格式化输出",
+            "type": "template-transform",
+            "desc": "",
+            "selected": false,
+            "variables": [
+              {
+                "variable": "height_cm",
+                "value_selector": [
+                  "1000000000002",
+                  "height_cm"
+                ]
+              },
+              {
+                "variable": "weight_kg",
+                "value_selector": [
+                  "1000000000002",
+                  "weight_kg"
+                ]
+              },
+              {
+                "variable": "age",
+                "value_selector": [
+                  "1000000000002",
+                  "age"
+                ]
+              },
+              {
+                "variable": "gender_cn",
+                "value_selector": [
+                  "1000000000002",
+                  "gender_cn"
+                ]
+              },
+              {
+                "variable": "tdee",
+                "value_selector": [
+                  "1000000000014",
+                  "tdee"
+                ]
+              },
+              {
+                "variable": "breakfast_summary",
+                "value_selector": [
+                  "1000000000013",
+                  "breakfast_summary"
+                ]
+              },
+              {
+                "variable": "lunch_summary",
+                "value_selector": [
+                  "1000000000013",
+                  "lunch_summary"
+                ]
+              },
+              {
+                "variable": "dinner_summary",
+                "value_selector": [
+                  "1000000000013",
+                  "dinner_summary"
+                ]
+              },
+              {
+                "variable": "intake_total",
+                "value_selector": [
+                  "1000000000013",
+                  "intake_total"
+                ]
+              },
+              {
+                "variable": "intake_vs_need",
+                "value_selector": [
+                  "1000000000015",
+                  "intake_vs_need"
+                ]
+              },
+              {
+                "variable": "delta_text",
+                "value_selector": [
+                  "1000000000015",
+                  "delta_text"
+                ]
+              },
+              {
+                "variable": "conclusion",
+                "value_selector": [
+                  "1000000000015",
+                  "conclusion"
+                ]
+              },
+              {
+                "variable": "advice",
+                "value_selector": [
+                  "1000000000016",
+                  "advice"
+                ]
+              }
+            ],
+            "template": "【基础信息】\\n身高：{{ height_cm }} cm\\n体重：{{ weight_kg }} kg\\n年龄：{{ age }}\\n性别：{{ gender_cn }}\\n每日所需热量（TDEE）：{{ tdee }} kcal\\n\\n【今日饮食记录】\\n早餐：{{ breakfast_summary }}\\n午餐：{{ lunch_summary }}\\n晚餐：{{ dinner_summary }}\\n今日总摄入：{{ intake_total }} kcal\\n\\n【热量对比】\\n摄入 vs 所需：{{ intake_vs_need }}\\n差额：{{ delta_text }}\\n结论：{{ conclusion }}\\n\\n【建议】\\n{{ advice }}"
+          }
+        },
+        {
+          "id": "1000000000018",
+          "type": "custom",
+          "position": {
+            "x": 3010,
+            "y": 430
+          },
+          "positionAbsolute": {
+            "x": 3010,
+            "y": 430
+          },
+          "sourcePosition": "right",
+          "targetPosition": "left",
+          "width": 242,
+          "height": 88,
+          "selected": false,
+          "data": {
+            "title": "正常结束",
+            "type": "end",
+            "desc": "",
+            "selected": false,
+            "outputs": [
+              {
+                "variable": "report",
+                "value_type": "string",
+                "value_selector": [
+                  "1000000000017",
+                  "output"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "edges": [
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "start",
+            "targetType": "code"
+          },
+          "id": "e1-1000000000001-source-1000000000002-target",
+          "source": "1000000000001",
+          "sourceHandle": "source",
+          "target": "1000000000002",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "if-else"
+          },
+          "id": "e2-1000000000002-source-1000000000003-target",
+          "source": "1000000000002",
+          "sourceHandle": "source",
+          "target": "1000000000003",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "if-else",
+            "targetType": "template-transform"
+          },
+          "id": "e3-1000000000003-false-1000000000004-target",
+          "source": "1000000000003",
+          "sourceHandle": "false",
+          "target": "1000000000004",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "template-transform",
+            "targetType": "end"
+          },
+          "id": "e4-1000000000004-source-1000000000005-target",
+          "source": "1000000000004",
+          "sourceHandle": "source",
+          "target": "1000000000005",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "if-else",
+            "targetType": "list-operator"
+          },
+          "id": "e5-1000000000003-true-1000000000006-target",
+          "source": "1000000000003",
+          "sourceHandle": "true",
+          "target": "1000000000006",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "if-else",
+            "targetType": "list-operator"
+          },
+          "id": "e6-1000000000003-true-1000000000007-target",
+          "source": "1000000000003",
+          "sourceHandle": "true",
+          "target": "1000000000007",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "if-else",
+            "targetType": "list-operator"
+          },
+          "id": "e7-1000000000003-true-1000000000008-target",
+          "source": "1000000000003",
+          "sourceHandle": "true",
+          "target": "1000000000008",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "list-operator",
+            "targetType": "llm"
+          },
+          "id": "e8-1000000000006-source-1000000000009-target",
+          "source": "1000000000006",
+          "sourceHandle": "source",
+          "target": "1000000000009",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "list-operator",
+            "targetType": "llm"
+          },
+          "id": "e9-1000000000007-source-1000000000010-target",
+          "source": "1000000000007",
+          "sourceHandle": "source",
+          "target": "1000000000010",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "list-operator",
+            "targetType": "llm"
+          },
+          "id": "e10-1000000000008-source-1000000000011-target",
+          "source": "1000000000008",
+          "sourceHandle": "source",
+          "target": "1000000000011",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e11-1000000000002-source-1000000000012-target",
+          "source": "1000000000002",
+          "sourceHandle": "source",
+          "target": "1000000000012",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "llm",
+            "targetType": "code"
+          },
+          "id": "e12-1000000000009-source-1000000000012-target",
+          "source": "1000000000009",
+          "sourceHandle": "source",
+          "target": "1000000000012",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "llm",
+            "targetType": "code"
+          },
+          "id": "e13-1000000000010-source-1000000000012-target",
+          "source": "1000000000010",
+          "sourceHandle": "source",
+          "target": "1000000000012",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "llm",
+            "targetType": "code"
+          },
+          "id": "e14-1000000000011-source-1000000000012-target",
+          "source": "1000000000011",
+          "sourceHandle": "source",
+          "target": "1000000000012",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e15-1000000000012-source-1000000000013-target",
+          "source": "1000000000012",
+          "sourceHandle": "source",
+          "target": "1000000000013",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e16-1000000000002-source-1000000000014-target",
+          "source": "1000000000002",
+          "sourceHandle": "source",
+          "target": "1000000000014",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e17-1000000000013-source-1000000000015-target",
+          "source": "1000000000013",
+          "sourceHandle": "source",
+          "target": "1000000000015",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e18-1000000000014-source-1000000000015-target",
+          "source": "1000000000014",
+          "sourceHandle": "source",
+          "target": "1000000000015",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "code"
+          },
+          "id": "e19-1000000000015-source-1000000000016-target",
+          "source": "1000000000015",
+          "sourceHandle": "source",
+          "target": "1000000000016",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "template-transform"
+          },
+          "id": "e20-1000000000002-source-1000000000017-target",
+          "source": "1000000000002",
+          "sourceHandle": "source",
+          "target": "1000000000017",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "template-transform"
+          },
+          "id": "e21-1000000000013-source-1000000000017-target",
+          "source": "1000000000013",
+          "sourceHandle": "source",
+          "target": "1000000000017",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "template-transform"
+          },
+          "id": "e22-1000000000014-source-1000000000017-target",
+          "source": "1000000000014",
+          "sourceHandle": "source",
+          "target": "1000000000017",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "template-transform"
+          },
+          "id": "e23-1000000000015-source-1000000000017-target",
+          "source": "1000000000015",
+          "sourceHandle": "source",
+          "target": "1000000000017",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "code",
+            "targetType": "template-transform"
+          },
+          "id": "e24-1000000000016-source-1000000000017-target",
+          "source": "1000000000016",
+          "sourceHandle": "source",
+          "target": "1000000000017",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        },
+        {
+          "data": {
+            "isInIteration": false,
+            "isInLoop": false,
+            "sourceType": "template-transform",
+            "targetType": "end"
+          },
+          "id": "e25-1000000000017-source-1000000000018-target",
+          "source": "1000000000017",
+          "sourceHandle": "source",
+          "target": "1000000000018",
+          "targetHandle": "target",
+          "type": "custom",
+          "zIndex": 0
+        }
+      ],
+      "viewport": {
+        "x": 0,
+        "y": 0,
+        "zoom": 0.5
+      }
+    },
+    "rag_pipeline_variables": []
+  }
+}
