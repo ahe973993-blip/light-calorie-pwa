@@ -1,0 +1,19 @@
+﻿services:
+  - type: web
+    name: light-calorie-proxy
+    env: node
+    plan: free
+    rootDir: proxy_server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DIFY_BASE_URL
+        value: http://localhost/v1
+      - key: DIFY_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: MAX_FILE_MB
+        value: 12

@@ -34,6 +34,7 @@ python -m http.server 8080
 
 ### 后端：Render / Railway / 云服务器
 - 部署 `proxy_server/`
+- 已提供 `render.yaml`，可直接在 Render 里导入仓库自动创建服务
 - 配置环境变量：
   - `DIFY_BASE_URL`
   - `DIFY_API_KEY`
