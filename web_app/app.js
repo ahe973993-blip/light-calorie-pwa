@@ -1,4 +1,5 @@
 const DEFAULT_PUBLIC_PROXY_BASES = [
+  "https://5bf3fc17e5abb1.lhr.life",
   "https://5712b1106fa139.lhr.life",
   "https://2d5fa82986c410.lhr.life",
   "https://0b0b06ae9359d4.lhr.life",
