@@ -10,6 +10,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const multer = require("multer");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 
 if (typeof fetch !== "function" || typeof FormData !== "function" || typeof Blob !== "function") {
   throw new Error("Node.js >= 18 is required (fetch/FormData/Blob missing)");
@@ -26,21 +27,21 @@ const JWT_SECRET = String(process.env.JWT_SECRET || "").trim() || "change-this-j
 const TOKEN_EXPIRES_IN = String(process.env.TOKEN_EXPIRES_IN || "30d").trim();
 const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, "data", "store.json"));
 
-const SMS_PROVIDER = String(process.env.SMS_PROVIDER || "mock").trim().toLowerCase();
-const SMS_CODE_TTL_SEC = clampInt(Number(process.env.SMS_CODE_TTL_SEC || 300), 60, 1800, 300);
-const SMS_COOLDOWN_SEC = clampInt(Number(process.env.SMS_COOLDOWN_SEC || 60), 10, 600, 60);
-const SMS_DAILY_LIMIT = clampInt(Number(process.env.SMS_DAILY_LIMIT || 15), 1, 100, 15);
-const SMS_DEBUG_RETURN_CODE = String(process.env.SMS_DEBUG_RETURN_CODE || "").trim() === "true";
+const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "mock").trim().toLowerCase();
+const EMAIL_CODE_TTL_SEC = clampInt(Number(process.env.EMAIL_CODE_TTL_SEC || 300), 60, 1800, 300);
+const EMAIL_COOLDOWN_SEC = clampInt(Number(process.env.EMAIL_COOLDOWN_SEC || 60), 10, 600, 60);
+const EMAIL_DAILY_LIMIT = clampInt(Number(process.env.EMAIL_DAILY_LIMIT || 20), 1, 200, 20);
+const EMAIL_DEBUG_RETURN_CODE = String(process.env.EMAIL_DEBUG_RETURN_CODE || "").trim() === "true";
+const EMAIL_SUBJECT = String(process.env.EMAIL_SUBJECT || "轻卡小记登录验证码").trim();
 
-const TENCENT_SMS_SECRET_ID = String(process.env.TENCENT_SMS_SECRET_ID || "").trim();
-const TENCENT_SMS_SECRET_KEY = String(process.env.TENCENT_SMS_SECRET_KEY || "").trim();
-const TENCENT_SMS_APP_ID = String(process.env.TENCENT_SMS_APP_ID || "").trim();
-const TENCENT_SMS_SIGN_NAME = String(process.env.TENCENT_SMS_SIGN_NAME || "").trim();
-const TENCENT_SMS_TEMPLATE_ID = String(process.env.TENCENT_SMS_TEMPLATE_ID || "").trim();
-const TENCENT_SMS_REGION = String(process.env.TENCENT_SMS_REGION || "ap-guangzhou").trim();
-const TENCENT_SMS_TEMPLATE_PARAM_MODE = String(process.env.TENCENT_SMS_TEMPLATE_PARAM_MODE || "code_only")
-  .trim()
-  .toLowerCase();
+const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
+const RESEND_FROM_EMAIL = String(process.env.RESEND_FROM_EMAIL || "").trim();
+const SMTP_HOST = String(process.env.SMTP_HOST || "").trim();
+const SMTP_PORT = clampInt(Number(process.env.SMTP_PORT || 465), 1, 65535, 465);
+const SMTP_SECURE = parseBool(process.env.SMTP_SECURE, SMTP_PORT === 465);
+const SMTP_USER = String(process.env.SMTP_USER || "").trim();
+const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
+const SMTP_FROM = String(process.env.SMTP_FROM || "").trim();
 
 if (!DIFY_API_KEY) {
   console.warn("[WARN] DIFY_API_KEY is empty. Proxy calls will fail until you set it in .env");
@@ -48,8 +49,8 @@ if (!DIFY_API_KEY) {
 if (JWT_SECRET === "change-this-jwt-secret") {
   console.warn("[WARN] JWT_SECRET uses default value. Please set JWT_SECRET in production.");
 }
-if (!isSmsProviderReady()) {
-  console.warn(`[WARN] SMS provider is not fully configured. provider=${SMS_PROVIDER}`);
+if (!isEmailProviderReady()) {
+  console.warn(`[WARN] Email provider is not fully configured. provider=${EMAIL_PROVIDER}`);
 }
 
 const EMPTY_DB = {
@@ -60,9 +61,11 @@ const EMPTY_DB = {
 let db = structuredClone(EMPTY_DB);
 let saveQueue = Promise.resolve();
 
-const smsCodeStore = new Map();
-const smsSendAtStore = new Map();
-const smsDailyCountStore = new Map();
+const emailCodeStore = new Map();
+const emailSendAtStore = new Map();
+const emailDailyCountStore = new Map();
+let smtpTransporter = null;
+let smtpTransportSignature = "";
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(morgan("dev"));
@@ -99,55 +102,55 @@ app.get("/api/health", (req, res) => {
     has_jwt_secret: Boolean(JWT_SECRET),
     users: db.users.length,
     records: db.meal_records.length,
-    sms_provider: SMS_PROVIDER,
-    sms_provider_ready: isSmsProviderReady(),
-    sms_code_ttl_sec: SMS_CODE_TTL_SEC,
-    sms_cooldown_sec: SMS_COOLDOWN_SEC,
-    sms_daily_limit: SMS_DAILY_LIMIT,
+    email_provider: EMAIL_PROVIDER,
+    email_provider_ready: isEmailProviderReady(),
+    email_code_ttl_sec: EMAIL_CODE_TTL_SEC,
+    email_cooldown_sec: EMAIL_COOLDOWN_SEC,
+    email_daily_limit: EMAIL_DAILY_LIMIT,
   });
 });
 
-app.post("/api/auth/sms/send", async (req, res) => {
+app.post("/api/auth/email/send", async (req, res) => {
   try {
-    const phone = normalizePhone(req.body?.phone);
-    if (!isValidPhone(phone)) {
-      return res.status(400).json({ message: "请输入正确的手机号" });
+    const email = normalizeEmail(req.body?.email);
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "请输入正确的邮箱地址" });
     }
 
-    if (!isSmsProviderReady()) {
-      return res.status(500).json({ message: "短信服务未配置完成，请联系管理员" });
+    if (!isEmailProviderReady()) {
+      return res.status(500).json({ message: "邮箱服务未配置完成，请联系管理员" });
     }
 
     const now = Date.now();
-    const lastSentAt = smsSendAtStore.get(phone) || 0;
-    const cooldownMs = SMS_COOLDOWN_SEC * 1000;
+    const lastSentAt = emailSendAtStore.get(email) || 0;
+    const cooldownMs = EMAIL_COOLDOWN_SEC * 1000;
     if (now - lastSentAt < cooldownMs) {
       const retrySec = Math.ceil((cooldownMs - (now - lastSentAt)) / 1000);
       return res.status(429).json({ message: `请求过于频繁，请 ${retrySec}s 后重试` });
     }
 
     const dateKey = localDateKey(new Date(now));
-    const dailyCountKey = `${dateKey}:${phone}`;
-    const sentToday = Number(smsDailyCountStore.get(dailyCountKey) || 0);
-    if (sentToday >= SMS_DAILY_LIMIT) {
-      return res.status(429).json({ message: "该手机号今日验证码次数已达上限，请明天再试" });
+    const dailyCountKey = `${dateKey}:${email}`;
+    const sentToday = Number(emailDailyCountStore.get(dailyCountKey) || 0);
+    if (sentToday >= EMAIL_DAILY_LIMIT) {
+      return res.status(429).json({ message: "该邮箱今日验证码次数已达上限，请明天再试" });
     }
 
-    const code = generateSmsCode();
-    smsCodeStore.set(phone, {
+    const code = generateEmailCode();
+    emailCodeStore.set(email, {
       code,
-      expires_at: now + SMS_CODE_TTL_SEC * 1000,
+      expires_at: now + EMAIL_CODE_TTL_SEC * 1000,
     });
-    smsSendAtStore.set(phone, now);
-    smsDailyCountStore.set(dailyCountKey, sentToday + 1);
+    emailSendAtStore.set(email, now);
+    emailDailyCountStore.set(dailyCountKey, sentToday + 1);
 
-    await sendSmsByProvider({ phone, code });
+    await sendEmailByProvider({ email, code });
 
-    if (SMS_PROVIDER === "mock" || SMS_DEBUG_RETURN_CODE) {
+    if (EMAIL_PROVIDER === "mock" || EMAIL_DEBUG_RETURN_CODE) {
       return res.json({
         ok: true,
         message: "验证码已发送",
-        expires_in_sec: SMS_CODE_TTL_SEC,
+        expires_in_sec: EMAIL_CODE_TTL_SEC,
         dev_code: code,
       });
     }
@@ -155,45 +158,46 @@ app.post("/api/auth/sms/send", async (req, res) => {
     return res.json({
       ok: true,
       message: "验证码已发送",
-      expires_in_sec: SMS_CODE_TTL_SEC,
+      expires_in_sec: EMAIL_CODE_TTL_SEC,
     });
   } catch (error) {
     return res.status(500).json({ message: errorMessage(error) });
   }
 });
 
-app.post("/api/auth/phone/login", async (req, res) => {
-  const phone = normalizePhone(req.body?.phone);
+app.post("/api/auth/email/login", async (req, res) => {
+  const email = normalizeEmail(req.body?.email);
   const code = String(req.body?.code || "").trim();
 
-  if (!isValidPhone(phone)) {
-    return res.status(400).json({ message: "请输入正确的手机号" });
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ message: "请输入正确的邮箱地址" });
   }
   if (!/^\d{6}$/.test(code)) {
     return res.status(400).json({ message: "验证码格式不正确" });
   }
 
-  const entry = smsCodeStore.get(phone);
+  const entry = emailCodeStore.get(email);
   if (!entry) {
     return res.status(401).json({ message: "验证码无效或已过期" });
   }
   if (Date.now() > entry.expires_at) {
-    smsCodeStore.delete(phone);
+    emailCodeStore.delete(email);
     return res.status(401).json({ message: "验证码已过期，请重新发送" });
   }
   if (entry.code !== code) {
     return res.status(401).json({ message: "验证码错误" });
   }
 
-  smsCodeStore.delete(phone);
+  emailCodeStore.delete(email);
 
-  let user = findUserByPhone(phone);
+  let user = findUserByEmail(email);
   if (!user) {
     const nowIso = new Date().toISOString();
+    const nickname = buildNicknameFromEmail(email);
     user = {
       id: crypto.randomUUID(),
-      phone,
-      nickname: `用户${phone.slice(-4)}`,
+      email,
+      nickname,
       created_at: nowIso,
       updated_at: nowIso,
     };
@@ -409,14 +413,14 @@ function bearerToken(req) {
   return match ? match[1].trim() : "";
 }
 
-function findUserByPhone(phone) {
-  return db.users.find((item) => item.phone === phone);
+function findUserByEmail(email) {
+  return db.users.find((item) => normalizeEmail(item.email) === email);
 }
 
 function publicUser(user) {
   return {
     id: user.id,
-    phone: user.phone,
+    email: user.email || "",
     nickname: user.nickname,
     created_at: user.created_at,
   };
@@ -549,85 +553,114 @@ function toDataUrl(file) {
   return `data:${mime};base64,${body}`;
 }
 
-function normalizePhone(value) {
-  return String(value || "").replace(/\D/g, "").slice(-11);
+function normalizeEmail(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
-function isValidPhone(phone) {
-  return /^1[3-9]\d{9}$/.test(phone);
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-function generateSmsCode() {
+function generateEmailCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-function isSmsProviderReady() {
-  if (SMS_PROVIDER === "mock") return true;
-  if (SMS_PROVIDER === "tencent") {
-    return Boolean(
-      TENCENT_SMS_SECRET_ID &&
-        TENCENT_SMS_SECRET_KEY &&
-        TENCENT_SMS_APP_ID &&
-        TENCENT_SMS_SIGN_NAME &&
-        TENCENT_SMS_TEMPLATE_ID
-    );
+function buildNicknameFromEmail(email) {
+  const local = String(email || "").split("@")[0] || "用户";
+  const safe = local.replace(/[^\w\u4e00-\u9fa5.-]/g, "");
+  return safe ? `用户${safe.slice(0, 12)}` : "用户";
+}
+
+function isEmailProviderReady() {
+  if (EMAIL_PROVIDER === "mock") return true;
+  if (EMAIL_PROVIDER === "resend") {
+    return Boolean(isConfiguredSecret(RESEND_API_KEY) && RESEND_FROM_EMAIL);
+  }
+  if (EMAIL_PROVIDER === "smtp") {
+    return Boolean(SMTP_HOST && SMTP_PORT && SMTP_USER && isConfiguredSecret(SMTP_PASS) && SMTP_FROM);
   }
   return false;
 }
 
-async function sendSmsByProvider({ phone, code }) {
-  if (SMS_PROVIDER === "mock") {
-    console.log(`[sms][mock] phone=${phone} code=${code}`);
+async function sendEmailByProvider({ email, code }) {
+  if (EMAIL_PROVIDER === "mock") {
+    console.log(`[email][mock] email=${email} code=${code}`);
     return;
   }
-  if (SMS_PROVIDER === "tencent") {
-    await sendSmsByTencent({ phone, code });
+  if (EMAIL_PROVIDER === "resend") {
+    await sendEmailByResend({ email, code });
     return;
   }
-  throw new Error(`不支持的短信服务提供商: ${SMS_PROVIDER}`);
+  if (EMAIL_PROVIDER === "smtp") {
+    await sendEmailBySmtp({ email, code });
+    return;
+  }
+  throw new Error(`不支持的邮箱服务提供商: ${EMAIL_PROVIDER}`);
 }
 
-async function sendSmsByTencent({ phone, code }) {
-  let sdk;
-  try {
-    sdk = require("tencentcloud-sdk-nodejs-sms");
-  } catch {
-    throw new Error("未安装腾讯云短信 SDK，请执行 npm install");
+async function sendEmailByResend({ email, code }) {
+  const html = buildVerificationEmailHtml(code);
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: RESEND_FROM_EMAIL,
+      to: [email],
+      subject: EMAIL_SUBJECT,
+      html,
+    }),
+  });
+
+  const data = await safeJson(response);
+  if (!response.ok) {
+    throw new Error(`邮件发送失败(${response.status}): ${extractError(data)}`);
+  }
+}
+
+function getSmtpTransporter() {
+  const signature = [SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER].join("|");
+  if (smtpTransporter && smtpTransportSignature === signature) {
+    return smtpTransporter;
   }
 
-  const SmsClient = sdk.sms.v20210111.Client;
-  const client = new SmsClient({
-    credential: {
-      secretId: TENCENT_SMS_SECRET_ID,
-      secretKey: TENCENT_SMS_SECRET_KEY,
-    },
-    region: TENCENT_SMS_REGION,
-    profile: {
-      httpProfile: {
-        endpoint: "sms.tencentcloudapi.com",
-      },
+  smtpTransportSignature = signature;
+  smtpTransporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    auth: {
+      user: SMTP_USER,
+      pass: SMTP_PASS,
     },
   });
 
-  const ttlMinutes = Math.ceil(SMS_CODE_TTL_SEC / 60);
-  const templateParamSet =
-    TENCENT_SMS_TEMPLATE_PARAM_MODE === "code_and_minutes" ? [code, String(ttlMinutes)] : [code];
+  return smtpTransporter;
+}
 
-  const params = {
-    SmsSdkAppId: TENCENT_SMS_APP_ID,
-    SignName: TENCENT_SMS_SIGN_NAME,
-    TemplateId: TENCENT_SMS_TEMPLATE_ID,
-    TemplateParamSet: templateParamSet,
-    PhoneNumberSet: [`+86${phone}`],
-    SessionContext: "light-calorie-login",
-  };
+async function sendEmailBySmtp({ email, code }) {
+  const transporter = getSmtpTransporter();
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to: email,
+    subject: EMAIL_SUBJECT,
+    text: `你的验证码是 ${code}，有效期 ${Math.ceil(EMAIL_CODE_TTL_SEC / 60)} 分钟。请勿泄露给他人。`,
+    html: buildVerificationEmailHtml(code),
+  });
+}
 
-  const resp = await client.SendSms(params);
-  const status = Array.isArray(resp?.SendStatusSet) ? resp.SendStatusSet[0] : null;
-  if (!status || String(status.Code || "") !== "Ok") {
-    const detail = status ? `${status.Code || "Unknown"} ${status.Message || ""}`.trim() : JSON.stringify(resp);
-    throw new Error(`短信发送失败: ${detail}`);
-  }
+function buildVerificationEmailHtml(code) {
+  return `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'PingFang SC','Microsoft YaHei',sans-serif;line-height:1.6;color:#222;">
+      <h2 style="margin:0 0 12px;">轻卡小记 登录验证码</h2>
+      <p>你的验证码是：</p>
+      <p style="font-size:28px;font-weight:700;letter-spacing:4px;margin:8px 0 16px;">${code}</p>
+      <p>有效期 ${Math.ceil(EMAIL_CODE_TTL_SEC / 60)} 分钟。请勿泄露给他人。</p>
+    </div>
+  `.trim();
 }
 
 function normalizeDateKey(value) {
@@ -651,6 +684,21 @@ function clampInt(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function parseBool(value, fallback = false) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text) return fallback;
+  if (["1", "true", "yes", "on"].includes(text)) return true;
+  if (["0", "false", "no", "off"].includes(text)) return false;
+  return fallback;
+}
+
+function isConfiguredSecret(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/^(REPLACE_WITH_|YOUR_)/i.test(text)) return false;
+  return true;
 }
 
 function toNumber(value) {

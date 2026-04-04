@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "dify-nutrition-proxy",
   "version": "1.0.0",
   "private": true,
@@ -19,6 +19,6 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
-    "tencentcloud-sdk-nodejs-sms": "^4.1.196"
+    "nodemailer": "^8.0.4"
   }
 }

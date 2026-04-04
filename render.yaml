@@ -23,27 +23,31 @@
         value: 30d
       - key: DB_PATH
         value: ./data/store.json
-      - key: SMS_PROVIDER
+      - key: EMAIL_PROVIDER
         value: mock
-      - key: SMS_CODE_TTL_SEC
+      - key: EMAIL_CODE_TTL_SEC
         value: 300
-      - key: SMS_COOLDOWN_SEC
+      - key: EMAIL_COOLDOWN_SEC
         value: 60
-      - key: SMS_DAILY_LIMIT
-        value: 15
-      - key: SMS_DEBUG_RETURN_CODE
+      - key: EMAIL_DAILY_LIMIT
+        value: 20
+      - key: EMAIL_DEBUG_RETURN_CODE
         value: false
-      - key: TENCENT_SMS_SECRET_ID
+      - key: EMAIL_SUBJECT
+        value: 轻卡小记登录验证码
+      - key: SMTP_HOST
         sync: false
-      - key: TENCENT_SMS_SECRET_KEY
+      - key: SMTP_PORT
+        value: 465
+      - key: SMTP_SECURE
+        value: true
+      - key: SMTP_USER
         sync: false
-      - key: TENCENT_SMS_APP_ID
+      - key: SMTP_PASS
         sync: false
-      - key: TENCENT_SMS_SIGN_NAME
+      - key: SMTP_FROM
         sync: false
-      - key: TENCENT_SMS_TEMPLATE_ID
+      - key: RESEND_API_KEY
         sync: false
-      - key: TENCENT_SMS_REGION
-        value: ap-guangzhou
-      - key: TENCENT_SMS_TEMPLATE_PARAM_MODE
-        value: code_only
+      - key: RESEND_FROM_EMAIL
+        sync: false

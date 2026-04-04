@@ -8,8 +8,8 @@
 
 ## 目录结构
 - `dify_workflow/`：Dify DSL 与代码节点
-- `web_app/`：前端网页（支持手机号登录、时间线、周统计图、体重趋势、连续打卡、PWA）
-- `proxy_server/`：后端代理（Node.js + Express，支持手机号验证码登录）
+- `web_app/`：前端网页（支持邮箱验证码登录、时间线、周统计图、体重趋势、连续打卡、PWA）
+- `proxy_server/`：后端代理（Node.js + Express，支持邮箱验证码登录）
 - `ios_app/`：iOS 应用工程
 
 ## 本地运行
@@ -39,7 +39,7 @@ python -m http.server 8080
   - `DIFY_BASE_URL`
   - `DIFY_API_KEY`
   - `JWT_SECRET`
-  - `SMS_PROVIDER`（生产建议 `tencent`）
+  - `EMAIL_PROVIDER`（测试 `mock`，免费生产建议 `smtp`）
   - `CORS_ORIGIN`（设为前端域名）
 
 ## 安全

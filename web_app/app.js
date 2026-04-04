@@ -33,11 +33,12 @@ const authLoggedOutEl = document.getElementById("auth-logged-out");
 const authLoggedInEl = document.getElementById("auth-logged-in");
 const authUserNameEl = document.getElementById("auth-user-name");
 
-const phoneLoginForm = document.getElementById("phone-login-form");
+const emailLoginForm = document.getElementById("email-login-form");
 const sendCodeBtn = document.getElementById("send-code-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 let authToken = "";
 let currentUser = null;
@@ -122,14 +123,14 @@ form.addEventListener("submit", async (event) => {
 });
 
 function bindAuthEvents() {
-  phoneLoginForm?.addEventListener("submit", async (event) => {
+  emailLoginForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const fd = new FormData(phoneLoginForm);
-    const phone = String(fd.get("phone") || "").trim();
+    const fd = new FormData(emailLoginForm);
+    const email = String(fd.get("email") || "").trim().toLowerCase();
     const code = String(fd.get("code") || "").trim();
 
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      setAuthTip("请输入正确的 11 位手机号", true);
+    if (!EMAIL_REGEX.test(email)) {
+      setAuthTip("请输入正确的邮箱地址", true);
       return;
     }
     if (!/^\d{6}$/.test(code)) {
@@ -139,9 +140,9 @@ function bindAuthEvents() {
 
     try {
       setAuthTip("登录中...");
-      const data = await apiJson("/api/auth/phone/login", {
+      const data = await apiJson("/api/auth/email/login", {
         method: "POST",
-        body: JSON.stringify({ phone, code }),
+        body: JSON.stringify({ email, code }),
       });
 
       setSession(data.token, data.user);
@@ -158,12 +159,16 @@ function bindAuthEvents() {
     if (sendCodeCooldown > 0) {
       return;
     }
+    if (!emailLoginForm) {
+      setAuthTip("登录表单加载失败，请刷新页面重试", true);
+      return;
+    }
 
-    const fd = new FormData(phoneLoginForm);
-    const phone = String(fd.get("phone") || "").trim();
+    const fd = new FormData(emailLoginForm);
+    const email = String(fd.get("email") || "").trim().toLowerCase();
 
-    if (!/^1[3-9]\d{9}$/.test(phone)) {
-      setAuthTip("请输入正确的 11 位手机号", true);
+    if (!EMAIL_REGEX.test(email)) {
+      setAuthTip("请输入正确的邮箱地址", true);
       return;
     }
 
@@ -173,15 +178,15 @@ function bindAuthEvents() {
         sendCodeBtn.textContent = "发送中...";
       }
       setAuthTip("正在发送验证码...");
-      const data = await apiJson("/api/auth/sms/send", {
+      const data = await apiJson("/api/auth/email/send", {
         method: "POST",
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ email }),
       });
 
       if (data?.dev_code) {
         setAuthTip(`测试验证码：${data.dev_code}（正式环境不会展示）`);
       } else {
-        setAuthTip("验证码已发送，请查收短信。");
+        setAuthTip("验证码已发送，请查收邮箱。");
       }
 
       startSendCodeCooldown(60);
@@ -207,7 +212,7 @@ function bindAuthEvents() {
 async function probeBackendHealth() {
   try {
     await apiJson("/api/health", { method: "GET" });
-    setAuthTip(`后端连接正常（${activeApiBase}），请先发送验证码再登录。`);
+    setAuthTip(`后端连接正常（${activeApiBase}），请先发送邮箱验证码再登录。`);
   } catch {
     setAuthTip("后端暂不可用。请使用 ?api_base=https://你的后端域名 打开页面。", true);
   }
@@ -367,7 +372,7 @@ function applyAuthState() {
     if (!loggedIn) {
       authUserNameEl.textContent = "-";
     } else {
-      const nickname = currentUser.nickname || currentUser.phone || currentUser.email || "用户";
+      const nickname = currentUser.nickname || currentUser.email || "用户";
       authUserNameEl.textContent = `${nickname}`;
     }
   }

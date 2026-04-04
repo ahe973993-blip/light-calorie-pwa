@@ -3,7 +3,7 @@
 ## 作用
 - 前端只请求代理，不暴露 Dify API Key
 - 后端统一负责：
-  - 手机号验证码登录
+  - 邮箱验证码登录
   - 运行 Dify 工作流
   - 按用户保存饮食记录（云端同步）
 
@@ -21,18 +21,26 @@ cp .env.example .env
 - `DIFY_BASE_URL=https://api.dify.ai/v1`
 - `DIFY_API_KEY=你的Dify应用API_KEY`
 - `JWT_SECRET=长随机字符串`
-- `SMS_PROVIDER=mock|tencent`
+- `EMAIL_PROVIDER=mock|smtp|resend`
 - `DB_PATH=./data/store.json`
 
-真实短信（腾讯云）：
-- `SMS_PROVIDER=tencent`
-- `TENCENT_SMS_SECRET_ID`
-- `TENCENT_SMS_SECRET_KEY`
-- `TENCENT_SMS_APP_ID`
-- `TENCENT_SMS_SIGN_NAME`
-- `TENCENT_SMS_TEMPLATE_ID`
-- `TENCENT_SMS_REGION=ap-guangzhou`
-- `TENCENT_SMS_TEMPLATE_PARAM_MODE=code_only`（或 `code_and_minutes`）
+免费测试模式：
+- `EMAIL_PROVIDER=mock`
+- 可配 `EMAIL_DEBUG_RETURN_CODE=true`，前端会返回测试验证码（仅测试环境）
+
+免费生产模式（SMTP，推荐 QQ/163）：
+- `EMAIL_PROVIDER=smtp`
+- `SMTP_HOST=smtp.qq.com`（或 `smtp.163.com`）
+- `SMTP_PORT=465`
+- `SMTP_SECURE=true`
+- `SMTP_USER=你的邮箱`
+- `SMTP_PASS=SMTP授权码（不是邮箱登录密码）`
+- `SMTP_FROM=你的邮箱`
+
+生产邮件（Resend）：
+- `EMAIL_PROVIDER=resend`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`（例如 `noreply@你的域名`）
 
 ## 2) 安装依赖并启动
 ```bash
@@ -47,8 +55,8 @@ npm start
 
 ## 3) 主要 API
 ### 鉴权
-- `POST /api/auth/sms/send` 发送验证码
-- `POST /api/auth/phone/login` 手机号登录
+- `POST /api/auth/email/send` 发送邮箱验证码
+- `POST /api/auth/email/login` 邮箱验证码登录
 - `GET /api/auth/me` 获取当前用户
 
 ### 记录
@@ -63,4 +71,4 @@ npm start
 - `DIFY_API_KEY`、`JWT_SECRET` 必须只放后端。
 - 生产把 `CORS_ORIGIN` 限制为你的前端域名。
 - 为登录和提交接口增加限流、防刷。
-- 生产必须关闭 `SMS_DEBUG_RETURN_CODE`，避免把验证码回传给前端。
+- 生产必须关闭 `EMAIL_DEBUG_RETURN_CODE`，避免把验证码回传给前端。
