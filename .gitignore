@@ -3,6 +3,8 @@ node_modules/
 
 # Proxy secrets
 proxy_server/.env
+proxy_server/data/
+proxy_server/logs/
 
 # Logs
 *.log

@@ -1,9 +1,16 @@
-﻿const form = document.getElementById("nutrition-form");
+﻿const PROXY_BASE_URL = "https://ahe973993calorieproxyx.loca.lt";
+
+const AUTH_TOKEN_KEY = "xhs_auth_token_v2";
+const AUTH_USER_KEY = "xhs_auth_user_v2";
+const TIMELINE_CACHE_PREFIX = "xhs_timeline_cache_v2";
+
+const form = document.getElementById("nutrition-form");
 const submitBtn = document.getElementById("submit-btn");
 const statusText = document.getElementById("status-text");
 const resultTag = document.getElementById("result-tag");
 const reportEl = document.getElementById("result-report");
 const rawEl = document.getElementById("result-raw");
+
 const timelineListEl = document.getElementById("timeline-list");
 const timelineCountEl = document.getElementById("timeline-count");
 const streakDaysEl = document.getElementById("streak-days");
@@ -13,19 +20,47 @@ const weeklySummaryEl = document.getElementById("weekly-summary");
 const weightChartEl = document.getElementById("weight-chart");
 const weightSummaryEl = document.getElementById("weight-summary");
 
+const authStatusChipEl = document.getElementById("auth-status-chip");
+const authTipEl = document.getElementById("auth-tip");
+const authLoggedOutEl = document.getElementById("auth-logged-out");
+const authLoggedInEl = document.getElementById("auth-logged-in");
+const authUserNameEl = document.getElementById("auth-user-name");
+
+const phoneLoginForm = document.getElementById("phone-login-form");
+const sendCodeBtn = document.getElementById("send-code-btn");
+const wechatLoginBtn = document.getElementById("wechat-login-btn");
+const logoutBtn = document.getElementById("logout-btn");
+
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
-const timelineStorageKey = "xhs_meal_timeline_v2";
-const legacyTimelineStorageKey = "xhs_meal_timeline_v1";
-const PROXY_BASE_URL = "https://ahe973993calorieproxyx.loca.lt";
-const API_USER_ID = "xhs-web-user";
+
+let authToken = "";
+let currentUser = null;
+let timelineRecords = [];
+let sendCodeCooldown = 0;
+let sendCodeTimer = null;
 
 removeLegacySettingsPanel();
 registerServiceWorker();
 initImagePreview();
+bindAuthEvents();
+restoreAuthFromStorage();
+applyAuthState();
+hydrateTimelineFromCache();
 renderTimeline();
+handleWechatReturnToken();
+
+if (authToken) {
+  restoreSessionAndSync();
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  if (!authToken) {
+    setStatus("请先登录后再提交。", true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
 
   if (!form.checkValidity()) {
     form.reportValidity();
@@ -37,7 +72,6 @@ form.addEventListener("submit", async (event) => {
   setStatus("调用后端代理生成报告...");
 
   try {
-    const timelineImages = {};
     const selectedFiles = {};
 
     for (const field of fileInputs) {
@@ -45,37 +79,32 @@ form.addEventListener("submit", async (event) => {
       if (!file) {
         throw new Error(`${field} 未选择图片`);
       }
-
-      timelineImages[field] = await fileToDataUrl(file);
       selectedFiles[field] = file;
     }
 
-    setStatus("请求后端接口 /api/nutrition/run ...");
     const runData = await runWorkflowViaProxy({
       proxyUrl: PROXY_BASE_URL,
-      user: API_USER_ID,
       values,
       files: selectedFiles,
+      token: authToken,
     });
+
     const report = extractReportFromProxy(runData);
-    const totalKcalOverride = Number.isFinite(Number(runData?.total_kcal))
-      ? Number(runData.total_kcal)
-      : null;
 
     rawEl.textContent = JSON.stringify(runData, null, 2);
     reportEl.textContent = report;
-    appendTimelineRecord({
-      report,
-      values,
-      images: timelineImages,
-      runData: runData?.run || runData,
-      totalKcalOverride,
-    });
-    renderTimeline();
+
+    if (runData?.record) {
+      mergeRecord(runData.record);
+      persistTimelineCache();
+      renderTimeline();
+    } else {
+      await fetchCloudRecords(false);
+    }
 
     resultTag.textContent = "生成成功";
     resultTag.classList.add("hot");
-    setStatus("完成：报告已生成。", false);
+    setStatus("完成：报告已生成并同步到云端。", false);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     resultTag.textContent = "生成失败";
@@ -87,24 +116,332 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+function bindAuthEvents() {
+  phoneLoginForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const fd = new FormData(phoneLoginForm);
+    const phone = String(fd.get("phone") || "").trim();
+    const code = String(fd.get("code") || "").trim();
+
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      setAuthTip("请输入正确的 11 位手机号", true);
+      return;
+    }
+    if (!/^\d{6}$/.test(code)) {
+      setAuthTip("请输入 6 位验证码", true);
+      return;
+    }
+
+    try {
+      setAuthTip("登录中...");
+      const data = await apiJson("/api/auth/phone/login", {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
+      });
+
+      setSession(data.token, data.user);
+      applyAuthState();
+      await fetchCloudRecords(false);
+      setAuthTip("登录成功，已同步云端记录。");
+      setStatus("已登录，可跨设备同步。", false);
+    } catch (error) {
+      setAuthTip(errorMessage(error), true);
+    }
+  });
+
+  sendCodeBtn?.addEventListener("click", async () => {
+    if (sendCodeCooldown > 0) {
+      return;
+    }
+
+    const fd = new FormData(phoneLoginForm);
+    const phone = String(fd.get("phone") || "").trim();
+
+    if (!/^1[3-9]\d{9}$/.test(phone)) {
+      setAuthTip("请输入正确的 11 位手机号", true);
+      return;
+    }
+
+    try {
+      setAuthTip("正在发送验证码...");
+      const data = await apiJson("/api/auth/sms/send", {
+        method: "POST",
+        body: JSON.stringify({ phone }),
+      });
+
+      if (data?.dev_code) {
+        setAuthTip(`测试验证码：${data.dev_code}（正式环境不会展示）`);
+      } else {
+        setAuthTip("验证码已发送，请查收短信。");
+      }
+
+      startSendCodeCooldown(60);
+    } catch (error) {
+      setAuthTip(errorMessage(error), true);
+    }
+  });
+
+  wechatLoginBtn?.addEventListener("click", async () => {
+    try {
+      const redirectUri = window.location.href.split("#")[0];
+      const data = await apiJson(`/api/auth/wechat/url?redirect_uri=${encodeURIComponent(redirectUri)}`, {
+        method: "GET",
+      });
+      if (!data?.auth_url) {
+        throw new Error("微信登录暂不可用，请先用手机号登录");
+      }
+      window.location.href = data.auth_url;
+    } catch (error) {
+      setAuthTip(errorMessage(error), true);
+    }
+  });
+
+  logoutBtn?.addEventListener("click", () => {
+    clearSession();
+    applyAuthState();
+    timelineRecords = [];
+    renderTimeline();
+    setAuthTip("你已退出登录。");
+  });
+}
+
+function handleWechatReturnToken() {
+  const url = new URL(window.location.href);
+  const token = url.searchParams.get("auth_token");
+  const nickname = url.searchParams.get("nickname");
+  const uid = url.searchParams.get("uid");
+
+  if (!token) return;
+
+  const user = {
+    id: uid || "wechat-user",
+    nickname: nickname || "微信用户",
+  };
+
+  setSession(token, user);
+  applyAuthState();
+  restoreSessionAndSync();
+
+  url.searchParams.delete("auth_token");
+  url.searchParams.delete("nickname");
+  url.searchParams.delete("uid");
+  window.history.replaceState({}, "", url.toString());
+}
+
+async function restoreSessionAndSync() {
+  try {
+    const me = await apiJson("/api/auth/me", { method: "GET", auth: true });
+    currentUser = me.user;
+    persistAuthToStorage();
+    applyAuthState();
+    await fetchCloudRecords(false);
+    setAuthTip("云端记录已同步。");
+  } catch {
+    clearSession();
+    applyAuthState();
+    timelineRecords = [];
+    renderTimeline();
+    setAuthTip("登录态已失效，请重新登录。", true);
+  }
+}
+
+async function fetchCloudRecords(showStatus = true) {
+  if (!authToken) {
+    timelineRecords = [];
+    renderTimeline();
+    return;
+  }
+
+  if (showStatus) {
+    setStatus("正在同步云端记录...");
+  }
+
+  const data = await apiJson("/api/records?limit=180", { method: "GET", auth: true });
+  const rows = Array.isArray(data?.records) ? data.records.map(normalizeRecord).filter((x) => x.dateKey) : [];
+
+  timelineRecords = rows.sort((a, b) => String(b.dateKey).localeCompare(String(a.dateKey)));
+  persistTimelineCache();
+  renderTimeline();
+
+  if (showStatus) {
+    setStatus("云端记录同步完成。", false);
+  }
+}
+
+function mergeRecord(raw) {
+  const row = normalizeRecord(raw);
+  if (!row.dateKey) return;
+
+  const idx = timelineRecords.findIndex((item) => item.dateKey === row.dateKey);
+  if (idx >= 0) {
+    timelineRecords[idx] = row;
+  } else {
+    timelineRecords.unshift(row);
+  }
+
+  timelineRecords.sort((a, b) => String(b.dateKey).localeCompare(String(a.dateKey)));
+  timelineRecords = timelineRecords.slice(0, 180);
+}
+
+function normalizeRecord(record) {
+  const dateKey = normalizeDateKey(record?.dateKey || record?.date_key || record?.createdAt || record?.created_at);
+  const createdAt = String(record?.createdAt || record?.created_at || "");
+
+  return {
+    id: String(record?.id || ""),
+    dateKey,
+    createdAt,
+    updatedAt: String(record?.updatedAt || record?.updated_at || ""),
+    kcal: toNullableNumber(record?.kcal),
+    tdee: toNullableNumber(record?.tdee),
+    weightKg: toNullableNumber(record?.weightKg || record?.weight_kg),
+    breakfastItems: String(record?.breakfastItems || record?.breakfast_items || ""),
+    lunchItems: String(record?.lunchItems || record?.lunch_items || ""),
+    dinnerItems: String(record?.dinnerItems || record?.dinner_items || ""),
+    breakfastImage: String(record?.breakfastImage || record?.breakfast_image || ""),
+    lunchImage: String(record?.lunchImage || record?.lunch_image || ""),
+    dinnerImage: String(record?.dinnerImage || record?.dinner_image || ""),
+    report: String(record?.report || ""),
+  };
+}
+
+function hydrateTimelineFromCache() {
+  if (!currentUser?.id) {
+    timelineRecords = [];
+    return;
+  }
+
+  try {
+    const raw = localStorage.getItem(cacheKeyForUser(currentUser.id));
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) {
+      timelineRecords = [];
+      return;
+    }
+
+    timelineRecords = parsed.map(normalizeRecord).filter((item) => item.dateKey);
+  } catch {
+    timelineRecords = [];
+  }
+}
+
+function persistTimelineCache() {
+  if (!currentUser?.id) return;
+  localStorage.setItem(cacheKeyForUser(currentUser.id), JSON.stringify(timelineRecords));
+}
+
+function cacheKeyForUser(userId) {
+  return `${TIMELINE_CACHE_PREFIX}:${userId}`;
+}
+
+function restoreAuthFromStorage() {
+  try {
+    authToken = String(localStorage.getItem(AUTH_TOKEN_KEY) || "");
+    const rawUser = localStorage.getItem(AUTH_USER_KEY);
+    currentUser = rawUser ? JSON.parse(rawUser) : null;
+  } catch {
+    authToken = "";
+    currentUser = null;
+  }
+}
+
+function persistAuthToStorage() {
+  if (authToken) {
+    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+  }
+  if (currentUser) {
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
+  }
+}
+
+function clearSession() {
+  authToken = "";
+  currentUser = null;
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+  localStorage.removeItem(AUTH_USER_KEY);
+}
+
+function setSession(token, user) {
+  authToken = String(token || "");
+  currentUser = user || null;
+  persistAuthToStorage();
+}
+
+function applyAuthState() {
+  const loggedIn = Boolean(authToken && currentUser);
+
+  if (authLoggedOutEl) authLoggedOutEl.hidden = loggedIn;
+  if (authLoggedInEl) authLoggedInEl.hidden = !loggedIn;
+
+  if (authStatusChipEl) {
+    authStatusChipEl.textContent = loggedIn ? "已登录" : "未登录";
+    authStatusChipEl.classList.toggle("hot", loggedIn);
+  }
+
+  if (authUserNameEl) {
+    if (!loggedIn) {
+      authUserNameEl.textContent = "-";
+    } else {
+      const nickname = currentUser.nickname || currentUser.phone || currentUser.email || "用户";
+      authUserNameEl.textContent = `${nickname}`;
+    }
+  }
+
+  setSubmitEnabled(loggedIn);
+}
+
+function setSubmitEnabled(enabled) {
+  if (!submitBtn) return;
+  submitBtn.disabled = !enabled;
+  submitBtn.textContent = enabled ? "生成今日热量报告" : "请先登录后生成报告";
+}
+
+function setAuthTip(text, isError = false) {
+  if (!authTipEl) return;
+  authTipEl.textContent = text;
+  authTipEl.style.color = isError ? "#cf1634" : "#6f7280";
+}
+
+function startSendCodeCooldown(seconds) {
+  sendCodeCooldown = seconds;
+  renderSendCodeBtn();
+
+  if (sendCodeTimer) {
+    clearInterval(sendCodeTimer);
+    sendCodeTimer = null;
+  }
+
+  sendCodeTimer = setInterval(() => {
+    sendCodeCooldown -= 1;
+    if (sendCodeCooldown <= 0) {
+      clearInterval(sendCodeTimer);
+      sendCodeTimer = null;
+      sendCodeCooldown = 0;
+    }
+    renderSendCodeBtn();
+  }, 1000);
+}
+
+function renderSendCodeBtn() {
+  if (!sendCodeBtn) return;
+  if (sendCodeCooldown > 0) {
+    sendCodeBtn.disabled = true;
+    sendCodeBtn.textContent = `${sendCodeCooldown}s`;
+  } else {
+    sendCodeBtn.disabled = false;
+    sendCodeBtn.textContent = "发送验证码";
+  }
+}
+
 function collectValues() {
   const fd = new FormData(form);
   return Object.fromEntries(fd.entries());
 }
 
-function normalizeBaseUrl(url) {
-  return String(url || "").trim().replace(/\/$/, "");
-}
-
-function toMealName(field) {
-  if (field === "breakfast_image") return "早餐图片";
-  if (field === "lunch_image") return "午餐图片";
-  return "晚餐图片";
-}
-
 function setLoading(loading) {
-  submitBtn.disabled = loading;
-  submitBtn.textContent = loading ? "生成中，请稍候..." : "生成今日热量报告";
+  if (!submitBtn) return;
+  submitBtn.disabled = loading || !Boolean(authToken && currentUser);
+  submitBtn.textContent = loading ? "生成中，请稍候..." : Boolean(authToken && currentUser) ? "生成今日热量报告" : "请先登录后生成报告";
 }
 
 function setStatus(text, isError = false) {
@@ -112,79 +449,9 @@ function setStatus(text, isError = false) {
   statusText.style.color = isError ? "#cf1634" : "#6f7280";
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("图片读取失败"));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function uploadFile({ baseUrl, apiKey, user, file }) {
+async function runWorkflowViaProxy({ proxyUrl, values, files, token }) {
   const fd = new FormData();
-  fd.append("file", file);
-  fd.append("user", user);
-
-  const response = await fetch(`${baseUrl}/files/upload`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: fd,
-  });
-
-  const data = await safeReadJson(response);
-
-  if (!response.ok) {
-    throw new Error(`上传失败(${response.status})：${extractError(data)}`);
-  }
-
-  const uploadId =
-    data?.id ||
-    data?.upload_file_id ||
-    data?.data?.id ||
-    data?.data?.upload_file_id;
-
-  if (!uploadId) {
-    throw new Error(`上传响应缺少文件ID：${JSON.stringify(data)}`);
-  }
-
-  return uploadId;
-}
-
-async function runWorkflow({ baseUrl, apiKey, user, inputs }) {
-  const payload = {
-    inputs,
-    response_mode: "blocking",
-    user,
-  };
-
-  const response = await fetch(`${baseUrl}/workflows/run`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await safeReadJson(response);
-
-  if (!response.ok) {
-    throw new Error(`工作流运行失败(${response.status})：${extractError(data)}`);
-  }
-
-  return data;
-}
-
-async function runWorkflowViaProxy({ proxyUrl, user, values, files }) {
-  if (!proxyUrl) {
-    throw new Error("Proxy URL 不能为空");
-  }
-
-  const fd = new FormData();
-  fd.append("user", user || "xhs-web-user");
+  fd.append("date_key", toDateKeyLocal(new Date()));
   fd.append("height_cm", String(values.height_cm || ""));
   fd.append("weight_kg", String(values.weight_kg || ""));
   fd.append("age", String(values.age || ""));
@@ -201,14 +468,44 @@ async function runWorkflowViaProxy({ proxyUrl, user, values, files }) {
   const response = await fetch(`${proxyUrl}/api/nutrition/run`, {
     method: "POST",
     headers: {
+      Authorization: `Bearer ${token}`,
       "bypass-tunnel-reminder": "true",
     },
     body: fd,
   });
-  const data = await safeReadJson(response);
 
+  const data = await safeReadJson(response);
   if (!response.ok) {
     throw new Error(`代理调用失败(${response.status})：${extractError(data)}`);
+  }
+
+  return data;
+}
+
+async function apiJson(pathname, { method = "GET", body = null, auth = false } = {}) {
+  const headers = {
+    "bypass-tunnel-reminder": "true",
+  };
+
+  if (body && !(body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (auth) {
+    if (!authToken) {
+      throw new Error("未登录");
+    }
+    headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  const response = await fetch(`${PROXY_BASE_URL}${pathname}`, {
+    method,
+    headers,
+    body,
+  });
+
+  const data = await safeReadJson(response);
+  if (!response.ok) {
+    throw new Error(extractError(data));
   }
 
   return data;
@@ -225,10 +522,7 @@ function extractReport(runData) {
     return outputs.outputString;
   }
 
-  const firstText = Object.values(outputs).find(
-    (value) => typeof value === "string" && value.trim()
-  );
-
+  const firstText = Object.values(outputs).find((value) => typeof value === "string" && value.trim());
   if (typeof firstText === "string") {
     return firstText;
   }
@@ -257,134 +551,14 @@ function extractError(data) {
   return data?.message || data?.error || data?.detail || JSON.stringify(data);
 }
 
-function extractKcal(report, runData) {
-  const outputs = runData?.data?.outputs || runData?.outputs || {};
-  const directKcal = Number(outputs?.intake_total);
-  if (Number.isFinite(directKcal) && directKcal > 0) {
-    return Math.round(directKcal);
-  }
-
-  const text = String(report || "");
-  const match = text.match(/今日总摄入：\s*(\d+(?:\.\d+)?)\s*kcal/i);
-  if (match) {
-    return Math.round(Number(match[1]));
-  }
-
-  return null;
-}
-
-function extractTdee(report, runData) {
-  const outputs = runData?.data?.outputs || runData?.outputs || {};
-  const directTdee = Number(outputs?.tdee || outputs?.TDEE);
-  if (Number.isFinite(directTdee) && directTdee > 0) {
-    return Math.round(directTdee);
-  }
-
-  const text = String(report || "");
-  const match = text.match(/每日所需热量（TDEE）：\s*(\d+(?:\.\d+)?)\s*kcal/i);
-  if (match) {
-    return Math.round(Number(match[1]));
-  }
-
-  return null;
-}
-
-function appendTimelineRecord({ report, values, images, runData, totalKcalOverride }) {
-  const kcal = Number.isFinite(totalKcalOverride)
-    ? Math.round(Number(totalKcalOverride))
-    : extractKcal(report, runData);
-  const tdee = extractTdee(report, runData);
-  const weightKg = Number(values.weight_kg);
-  const now = new Date();
-  const dateKey = toDateKeyLocal(now);
-
-  const records = readTimeline();
-  const existingIndex = records.findIndex((item) => item.dateKey === dateKey);
-
-  const newItem = {
-    dateKey,
-    createdAt: now.toISOString(),
-    kcal,
-    tdee,
-    weightKg: Number.isFinite(weightKg) ? Number(weightKg) : null,
-    breakfastItems: values.breakfast_items,
-    lunchItems: values.lunch_items,
-    dinnerItems: values.dinner_items,
-    breakfastImage: images.breakfast_image || "",
-    lunchImage: images.lunch_image || "",
-    dinnerImage: images.dinner_image || "",
-  };
-
-  if (existingIndex >= 0) {
-    records[existingIndex] = newItem;
-  } else {
-    records.unshift(newItem);
-  }
-
-  writeTimeline(records.slice(0, 90));
-}
-
-function readTimeline() {
-  const candidates = [timelineStorageKey, legacyTimelineStorageKey];
-  for (const key of candidates) {
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = raw ? JSON.parse(raw) : [];
-      if (Array.isArray(parsed)) {
-        const normalized = parsed
-          .map(normalizeRecord)
-          .filter((item) => item.dateKey)
-          .sort((a, b) => b.dateKey.localeCompare(a.dateKey));
-
-        if (key !== timelineStorageKey && normalized.length > 0) {
-          writeTimeline(normalized);
-          localStorage.removeItem(legacyTimelineStorageKey);
-        }
-
-        return normalized;
-      }
-    } catch {
-      // ignore malformed localStorage
-    }
-  }
-  return [];
-}
-
-function normalizeRecord(record) {
-  const dateKey = normalizeDateKey(record?.dateKey || record?.createdAt || "");
-  const createdAt = String(record?.createdAt || "");
-  const kcal = Number(record?.kcal);
-  const tdee = Number(record?.tdee);
-  const weightKg = Number(record?.weightKg);
-
-  return {
-    dateKey,
-    createdAt,
-    kcal: Number.isFinite(kcal) ? kcal : null,
-    tdee: Number.isFinite(tdee) ? tdee : null,
-    weightKg: Number.isFinite(weightKg) ? weightKg : null,
-    breakfastItems: String(record?.breakfastItems || ""),
-    lunchItems: String(record?.lunchItems || ""),
-    dinnerItems: String(record?.dinnerItems || ""),
-    breakfastImage: String(record?.breakfastImage || ""),
-    lunchImage: String(record?.lunchImage || ""),
-    dinnerImage: String(record?.dinnerImage || ""),
-  };
-}
-
-function writeTimeline(records) {
-  localStorage.setItem(timelineStorageKey, JSON.stringify(records));
-}
-
 function renderTimeline() {
   if (!timelineListEl || !timelineCountEl) return;
 
-  const records = readTimeline();
+  const records = timelineRecords;
   timelineCountEl.textContent = `${records.length} 天记录`;
 
-  if (records.length === 0) {
-    timelineListEl.innerHTML =
-      '<div class="timeline-empty">还没有时间线记录，先生成一次今日报告。</div>';
+  if (!records.length) {
+    timelineListEl.innerHTML = '<div class="timeline-empty">还没有时间线记录，登录后生成一次报告即可同步。</div>';
     renderDashboard(records);
     return;
   }
@@ -394,12 +568,8 @@ function renderTimeline() {
       const date = parseDateKey(item.dateKey);
       const dayNum = Number.isFinite(date.getTime()) ? String(date.getDate()) : "--";
       const month = Number.isFinite(date.getTime()) ? `${date.getMonth() + 1}月` : "--";
-      const weekday = Number.isFinite(date.getTime())
-        ? `周${"日一二三四五六"[date.getDay()]}`
-        : "未知";
-      const dateText = Number.isFinite(date.getTime())
-        ? date.toLocaleDateString("zh-CN")
-        : item.dateKey;
+      const weekday = Number.isFinite(date.getTime()) ? `周${"日一二三四五六"[date.getDay()]}` : "未知";
+      const dateText = Number.isFinite(date.getTime()) ? date.toLocaleDateString("zh-CN") : item.dateKey;
       const kcalText = Number.isFinite(item.kcal) ? `${item.kcal} kcal` : "热量待补充";
 
       return `
@@ -429,9 +599,7 @@ function renderTimeline() {
 }
 
 function renderMealSlot(src, label, tagClass) {
-  const content = src
-    ? `<img src="${src}" alt="${label}图片" />`
-    : '<div class="timeline-meal-empty">暂无图片</div>';
+  const content = src ? `<img src="${src}" alt="${label}图片" />` : '<div class="timeline-meal-empty">暂无图片</div>';
 
   return `
     <div class="timeline-meal">
@@ -450,10 +618,9 @@ function renderDashboard(records) {
 function renderStreak(records) {
   if (!streakDaysEl || !streakHintEl) return;
 
-  const keys = [...new Set(records.map((item) => item.dateKey).filter(Boolean))]
-    .sort((a, b) => b.localeCompare(a));
+  const keys = [...new Set(records.map((item) => item.dateKey).filter(Boolean))].sort((a, b) => b.localeCompare(a));
 
-  if (keys.length === 0) {
+  if (!keys.length) {
     streakDaysEl.textContent = "0";
     streakHintEl.textContent = "还没有打卡记录";
     return;
@@ -466,16 +633,13 @@ function renderStreak(records) {
   while (true) {
     const prev = addDays(cursor, -1);
     const prevKey = toDateKeyLocal(prev);
-    if (!keys.includes(prevKey)) {
-      break;
-    }
+    if (!keys.includes(prevKey)) break;
     streak += 1;
     cursor = prev;
   }
 
-  const latestText = parseDateKey(latest).toLocaleDateString("zh-CN");
   streakDaysEl.textContent = String(streak);
-  streakHintEl.textContent = `最近打卡：${latestText}`;
+  streakHintEl.textContent = `最近打卡：${parseDateKey(latest).toLocaleDateString("zh-CN")}`;
 }
 
 function renderWeeklyChart(records) {
@@ -501,7 +665,7 @@ function renderWeeklyChart(records) {
 
   const validValues = values.filter((value) => Number.isFinite(value) && value > 0);
 
-  if (validValues.length === 0) {
+  if (!validValues.length) {
     weeklySummaryEl.textContent = "本周暂无数据";
     weeklyChartEl.innerHTML = '<div class="chart-empty">生成记录后显示近 7 天热量柱状图</div>';
     return;
@@ -517,14 +681,13 @@ function renderWeeklyChart(records) {
     .map((day, index) => {
       const value = values[index];
       const ratio = Number.isFinite(value) && value > 0 ? Math.max(value / maxValue, 0.06) : 0;
-      const height = `${Math.round(ratio * 100)}%`;
       const valueText = Number.isFinite(value) && value > 0 ? String(Math.round(value)) : "-";
 
       return `
         <div class="chart-bar-item" title="${day.label} 周${day.shortWeekday}">
           <div class="bar-value">${valueText}</div>
           <div class="bar-track">
-            <div class="bar-fill" style="height: ${height}; opacity: ${ratio > 0 ? 1 : 0};"></div>
+            <div class="bar-fill" style="height: ${Math.round(ratio * 100)}%; opacity: ${ratio > 0 ? 1 : 0};"></div>
           </div>
           <div class="bar-label">${day.shortWeekday}</div>
         </div>
@@ -561,8 +724,7 @@ function renderWeightTrend(records) {
 
   const points = source.map((item, index) => {
     const x = left + ((right - left) * index) / (source.length - 1);
-    const y =
-      bottom - ((Number(item.weightKg) - (min - range * 0.1)) / (range * 1.2)) * (bottom - top);
+    const y = bottom - ((Number(item.weightKg) - (min - range * 0.1)) / (range * 1.2)) * (bottom - top);
     return {
       ...item,
       x,
@@ -572,9 +734,7 @@ function renderWeightTrend(records) {
     };
   });
 
-  const path = points
-    .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`)
-    .join(" ");
+  const path = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" ");
 
   const first = points[0].weight;
   const last = points[points.length - 1].weight;
@@ -583,40 +743,23 @@ function renderWeightTrend(records) {
 
   weightSummaryEl.textContent = `最新 ${last.toFixed(1)} kg · 变化 ${diffText}`;
 
-  const minTextY = bottom + 11;
-  const maxTextY = top - 2;
   const startDate = points[0].date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
-  const endDate = points[points.length - 1].date.toLocaleDateString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-  });
+  const endDate = points[points.length - 1].date.toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" });
 
   weightChartEl.innerHTML = `
     <svg class="weight-chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="体重趋势图">
       <line class="weight-axis" x1="${left}" y1="${top}" x2="${left}" y2="${bottom}" />
       <line class="weight-axis" x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" />
-      <text class="weight-label" x="${left}" y="${minTextY}">${(min - 0.2).toFixed(1)}kg</text>
-      <text class="weight-label" x="${left}" y="${maxTextY}">${(max + 0.2).toFixed(1)}kg</text>
+      <text class="weight-label" x="${left}" y="${bottom + 11}">${(min - 0.2).toFixed(1)}kg</text>
+      <text class="weight-label" x="${left}" y="${top - 2}">${(max + 0.2).toFixed(1)}kg</text>
       <text class="weight-label" x="${left}" y="${height - 2}">${startDate}</text>
       <text class="weight-label" x="${right - 10}" y="${height - 2}">${endDate}</text>
       <path class="weight-line" d="${path}" />
       ${points
-        .map(
-          (point) =>
-            `<circle class="weight-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.8" />`
-        )
+        .map((point) => `<circle class="weight-point" cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="1.8" />`)
         .join("")}
     </svg>
   `;
-}
-
-async function safeReadJson(response) {
-  const text = await response.text();
-  try {
-    return text ? JSON.parse(text) : {};
-  } catch {
-    return { raw: text };
-  }
 }
 
 function initImagePreview() {
@@ -647,51 +790,9 @@ function initImagePreview() {
   });
 }
 
-function normalizeDateKey(raw) {
-  if (!raw) return "";
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) {
-    return String(raw);
-  }
-
-  const date = new Date(String(raw));
-  if (!Number.isFinite(date.getTime())) {
-    return "";
-  }
-  return toDateKeyLocal(date);
-}
-
-function parseDateKey(dateKey) {
-  if (!dateKey) return new Date("");
-  const match = String(dateKey).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) {
-    return new Date(String(dateKey));
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]) - 1;
-  const day = Number(match[3]);
-  return new Date(year, month, day);
-}
-
-function toDateKeyLocal(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function addDays(date, days) {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
 function removeLegacySettingsPanel() {
   const panel = document.querySelector(".settings");
-  if (panel) {
-    panel.remove();
-  }
+  if (panel) panel.remove();
 }
 
 function registerServiceWorker() {
@@ -720,9 +821,7 @@ function registerServiceWorker() {
           });
         });
       })
-      .catch(() => {
-        // silent fail for local development quirks
-      });
+      .catch(() => {});
 
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (refreshed) return;
@@ -730,4 +829,57 @@ function registerServiceWorker() {
       window.location.reload();
     });
   });
+}
+
+async function safeReadJson(response) {
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { raw: text };
+  }
+}
+
+function normalizeDateKey(raw) {
+  if (!raw) return "";
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) {
+    return String(raw);
+  }
+
+  const date = new Date(String(raw));
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+  return toDateKeyLocal(date);
+}
+
+function parseDateKey(dateKey) {
+  if (!dateKey) return new Date("");
+  const match = String(dateKey).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return new Date(String(dateKey));
+
+  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+}
+
+function toDateKeyLocal(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toNullableNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
 }

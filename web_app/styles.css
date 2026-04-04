@@ -114,6 +114,11 @@ body {
   margin-bottom: 18px;
 }
 
+.auth-card {
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -150,6 +155,69 @@ body {
 .chip.hot {
   background: var(--mint);
   color: #168e5e;
+}
+
+.auth-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.auth-form {
+  border: 1px solid #e6e9f4;
+  border-radius: 14px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.auth-form h3 {
+  margin: 0;
+  font-size: 14px;
+  color: #34384a;
+}
+
+.auth-user {
+  border: 1px solid #e6e9f4;
+  border-radius: 14px;
+  background: #fff;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.code-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.ghost-btn,
+.wechat-btn {
+  border: 1px solid #d8dceb;
+  border-radius: 12px;
+  background: #fff;
+  color: #3f465c;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover,
+.wechat-btn:hover {
+  border-color: #c5cae0;
+}
+
+.wechat-btn {
+  background: #ebfff3;
+  border-color: #b7ebcb;
+  color: #178a4b;
 }
 
 .form-section {
@@ -645,6 +713,10 @@ details > summary {
 
   .result-card {
     position: static;
+  }
+
+  .auth-grid {
+    grid-template-columns: 1fr;
   }
 }
 

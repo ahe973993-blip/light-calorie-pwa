@@ -3,13 +3,13 @@
 一个可上线的饮食记录系统，包含：
 - Dify 工作流 DSL（饮食识别 + 热量计算 + TDEE 对比）
 - 小红书风格网页前端
-- 后端代理（隐藏 API Key）
+- 后端代理（隐藏 API Key + 账号体系 + 云端同步）
 - iOS SwiftUI 工程骨架
 
 ## 目录结构
 - `dify_workflow/`：Dify DSL 与代码节点
-- `web_app/`：前端网页（支持时间线、周统计图、体重趋势、连续打卡、PWA）
-- `proxy_server/`：后端代理（Node.js + Express）
+- `web_app/`：前端网页（支持手机号登录、时间线、周统计图、体重趋势、连续打卡、PWA）
+- `proxy_server/`：后端代理（Node.js + Express，支持手机号验证码登录与微信登录入口）
 - `ios_app/`：iOS 应用工程
 
 ## 本地运行
@@ -38,10 +38,11 @@ python -m http.server 8080
 - 配置环境变量：
   - `DIFY_BASE_URL`
   - `DIFY_API_KEY`
+  - `JWT_SECRET`
+  - `FRONTEND_ORIGIN`
   - `CORS_ORIGIN`（设为前端域名）
 
-前端上线后，把页面中的 `Proxy URL` 改为线上代理地址，例如：
-- `https://your-proxy.onrender.com`
+前端上线后，如果你更换了后端域名，需要更新 `web_app/app.js` 里的 `PROXY_BASE_URL` 并重新发布。
 
 ## 安全
 - 不要把真实 API Key 提交到 GitHub。
