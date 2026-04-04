@@ -117,31 +117,7 @@
             </div>
           </div>
 
-          <details class="settings">
-            <summary>接口设置（高级）</summary>
-            <div class="field-grid">
-              <label class="toggle-label">
-                <span>使用后端代理（推荐上线）</span>
-                <input name="use_proxy" type="checkbox" checked />
-              </label>
-              <label>
-                Proxy URL
-                <input name="proxy_url" type="text" value="http://localhost:8787" />
-              </label>
-              <label>
-                Base URL
-                <input name="base_url" type="text" value="http://localhost/v1" />
-              </label>
-              <label>
-                API Key
-                <input name="api_key" type="password" placeholder="直连模式才需要填写" />
-              </label>
-              <label>
-                user
-                <input name="user" type="text" value="xhs-web-user" required />
-              </label>
-            </div>
-          </details>
+          <p class="timeline-hint">已连接后端服务，提交后将自动生成报告。</p>
 
           <button class="submit-btn" id="submit-btn" type="submit">
             生成今日热量报告

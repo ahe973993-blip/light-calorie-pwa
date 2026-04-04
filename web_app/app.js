@@ -16,6 +16,8 @@ const weightSummaryEl = document.getElementById("weight-summary");
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
 const timelineStorageKey = "xhs_meal_timeline_v2";
 const legacyTimelineStorageKey = "xhs_meal_timeline_v1";
+const PROXY_BASE_URL = "https://light-calorie-ai-proxy.loca.lt";
+const API_USER_ID = "xhs-web-user";
 
 registerServiceWorker();
 initImagePreview();
@@ -30,12 +32,8 @@ form.addEventListener("submit", async (event) => {
   }
 
   const values = collectValues();
-  const baseUrl = normalizeBaseUrl(values.base_url);
-  const proxyUrl = normalizeBaseUrl(values.proxy_url);
-  const useProxy = Boolean(form.elements.use_proxy?.checked);
-
   setLoading(true);
-  setStatus(useProxy ? "调用后端代理生成报告..." : "开始上传图片并运行工作流...");
+  setStatus("调用后端代理生成报告...");
 
   try {
     const timelineImages = {};
@@ -51,66 +49,17 @@ form.addEventListener("submit", async (event) => {
       selectedFiles[field] = file;
     }
 
-    let runData;
-    let report;
-    let totalKcalOverride = null;
-
-    if (useProxy) {
-      setStatus("请求代理接口 /api/nutrition/run ...");
-      runData = await runWorkflowViaProxy({
-        proxyUrl,
-        user: values.user,
-        values,
-        files: selectedFiles,
-      });
-      report = extractReportFromProxy(runData);
-      totalKcalOverride = Number.isFinite(Number(runData?.total_kcal))
-        ? Number(runData.total_kcal)
-        : null;
-    } else {
-      if (!String(values.api_key || "").trim()) {
-        throw new Error("直连模式需要填写 API Key");
-      }
-
-      const imagePayload = {};
-      for (const field of fileInputs) {
-        setStatus(`上传 ${toMealName(field)} ...`);
-        const uploadId = await uploadFile({
-          baseUrl,
-          apiKey: values.api_key,
-          user: values.user,
-          file: selectedFiles[field],
-        });
-        imagePayload[field] = [
-          {
-            type: "image",
-            transfer_method: "local_file",
-            upload_file_id: uploadId,
-          },
-        ];
-      }
-
-      const inputs = {
-        height_cm: Number(values.height_cm),
-        weight_kg: Number(values.weight_kg),
-        age: Number(values.age),
-        gender: values.gender,
-        activity_level: values.activity_level,
-        breakfast_items: values.breakfast_items,
-        lunch_items: values.lunch_items,
-        dinner_items: values.dinner_items,
-        ...imagePayload,
-      };
-
-      setStatus("调用 /workflows/run 生成报告...");
-      runData = await runWorkflow({
-        baseUrl,
-        apiKey: values.api_key,
-        user: values.user,
-        inputs,
-      });
-      report = extractReport(runData);
-    }
+    setStatus("请求后端接口 /api/nutrition/run ...");
+    const runData = await runWorkflowViaProxy({
+      proxyUrl: PROXY_BASE_URL,
+      user: API_USER_ID,
+      values,
+      files: selectedFiles,
+    });
+    const report = extractReportFromProxy(runData);
+    const totalKcalOverride = Number.isFinite(Number(runData?.total_kcal))
+      ? Number(runData.total_kcal)
+      : null;
 
     rawEl.textContent = JSON.stringify(runData, null, 2);
     reportEl.textContent = report;
@@ -131,7 +80,7 @@ form.addEventListener("submit", async (event) => {
     resultTag.textContent = "生成失败";
     resultTag.classList.remove("hot");
     reportEl.textContent = `请求失败：${message}`;
-    setStatus("失败，请检查 Base URL / API Key / 工作流发布状态。", true);
+    setStatus("失败，请稍后重试。若持续失败，联系管理员检查后端服务。", true);
   } finally {
     setLoading(false);
   }
