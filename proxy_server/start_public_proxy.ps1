@@ -7,7 +7,7 @@ $proxyLog = Join-Path $logDir 'proxy.log'
 $proxyErr = Join-Path $logDir 'proxy.err.log'
 $tunnelLog = Join-Path $logDir 'tunnel.log'
 $tunnelErr = Join-Path $logDir 'tunnel.err.log'
-$subdomain = 'ahe973993-calorie-proxy-20260404'
+$subdomain = 'ahe973993calorieproxyx'
 
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 
