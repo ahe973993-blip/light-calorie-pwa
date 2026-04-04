@@ -1,9 +1,9 @@
 const DEFAULT_PUBLIC_PROXY_BASES = [
-  "https://6703b1682b869d.lhr.life",
-  "https://b05ef8c6b09ae4.lhr.life",
+  "https://audit-committees-has-catalog.trycloudflare.com",
+  "https://a15eb743eca76b.lhr.life",
   "https://light-calorie-proxy.onrender.com",
 ];
-const API_BASE_STORAGE_KEY = "xhs_api_base_v3";
+const API_BASE_STORAGE_KEY = "xhs_api_base_v4";
 const API_BASE_CANDIDATES = buildApiBaseCandidates();
 let activeApiBase = API_BASE_CANDIDATES[0];
 
@@ -222,7 +222,7 @@ async function probeBackendHealth() {
     await apiJson("/api/health", { method: "GET" });
     setAuthTip(`后端连接正常（${activeApiBase}），请先发送邮箱验证码再登录。`);
   } catch {
-    setAuthTip("后端暂不可用。请使用 ?api_base=https://你的后端域名 打开页面。", true);
+    setAuthTip("后端暂不可用，请稍后重试。", true);
   }
 }
 
@@ -536,7 +536,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
     method,
     headers,
     body,
-  }, 15000);
+  }, 8000);
 
   const data = await safeReadJson(response);
   if (!response.ok) {
@@ -552,7 +552,7 @@ async function requestApi(pathname, init, timeoutMs = 10000) {
   const candidates = [activeApiBase, ...API_BASE_CANDIDATES.filter((base) => base !== activeApiBase)];
 
   if (!candidates.length) {
-    throw new Error("未配置后端地址。请使用 ?api_base=https://你的后端域名 打开页面。");
+    throw new Error("后端地址未配置");
   }
 
   for (const base of candidates) {
@@ -589,10 +589,10 @@ async function requestApi(pathname, init, timeoutMs = 10000) {
   }
 
   if (lastNetworkError) {
-    throw new Error(`无法连接后端服务。请在网址后追加 ?api_base=你的后端地址 。已尝试：${tried.join(" , ")}`);
+    throw new Error(`无法连接后端服务（已尝试：${tried.join(" , ")}）`);
   }
 
-  throw new Error(`后端服务不可用。请在网址后追加 ?api_base=你的后端地址 。已尝试：${tried.join(" , ")}`);
+  throw new Error(`后端服务不可用（已尝试：${tried.join(" , ")}）`);
 }
 
 function extractReport(runData) {
