@@ -689,3 +689,8 @@ details > summary {
     padding-top: 8px;
   }
 }
+
+/* Fallback: hide legacy advanced settings panel if an old cached HTML is loaded */
+.settings {
+  display: none !important;
+}

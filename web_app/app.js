@@ -19,6 +19,7 @@ const legacyTimelineStorageKey = "xhs_meal_timeline_v1";
 const PROXY_BASE_URL = "https://ahe973993-calorie-proxy-20260404.loca.lt";
 const API_USER_ID = "xhs-web-user";
 
+removeLegacySettingsPanel();
 registerServiceWorker();
 initImagePreview();
 renderTimeline();
@@ -686,16 +687,47 @@ function addDays(date, days) {
   return next;
 }
 
+function removeLegacySettingsPanel() {
+  const panel = document.querySelector(".settings");
+  if (panel) {
+    panel.remove();
+  }
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) {
     return;
   }
 
+  let refreshed = false;
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register("./service-worker.js")
+      .then((registration) => {
+        registration.update().catch(() => {});
+
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+
+        registration.addEventListener("updatefound", () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener("statechange", () => {
+            if (worker.state === "installed" && navigator.serviceWorker.controller) {
+              worker.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
+      })
       .catch(() => {
         // silent fail for local development quirks
       });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshed) return;
+      refreshed = true;
+      window.location.reload();
+    });
   });
 }
