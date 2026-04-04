@@ -199,6 +199,9 @@ async function runWorkflowViaProxy({ proxyUrl, user, values, files }) {
 
   const response = await fetch(`${proxyUrl}/api/nutrition/run`, {
     method: "POST",
+    headers: {
+      "bypass-tunnel-reminder": "true",
+    },
     body: fd,
   });
   const data = await safeReadJson(response);
