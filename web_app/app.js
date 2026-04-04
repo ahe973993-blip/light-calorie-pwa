@@ -509,7 +509,7 @@ async function runWorkflowViaProxy({ values, files, token }) {
       Authorization: `Bearer ${token}`,
     },
     body: fd,
-  });
+  }, 180000);
 
   const data = await safeReadJson(response);
   if (!response.ok) {
@@ -536,7 +536,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
     method,
     headers,
     body,
-  });
+  }, 15000);
 
   const data = await safeReadJson(response);
   if (!response.ok) {
@@ -546,7 +546,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
   return data;
 }
 
-async function requestApi(pathname, init) {
+async function requestApi(pathname, init, timeoutMs = 10000) {
   const tried = [];
   let lastNetworkError = null;
   const candidates = [activeApiBase, ...API_BASE_CANDIDATES.filter((base) => base !== activeApiBase)];
@@ -559,7 +559,7 @@ async function requestApi(pathname, init) {
     tried.push(base);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       let response;
       try {
         response = await fetch(`${base}${pathname}`, {
