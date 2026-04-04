@@ -1,4 +1,4 @@
-const CACHE_NAME = "light-calorie-pwa-v8";
+const CACHE_NAME = "light-calorie-pwa-v9";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -53,6 +53,22 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(() => caches.match("./index.html"))
+    );
+    return;
+  }
+
+  const networkFirstAssets = ["/index.html", "/app.js", "/styles.css", "/manifest.webmanifest"];
+  if (networkFirstAssets.some((suffix) => url.pathname.endsWith(suffix))) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === "basic") {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
