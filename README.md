@@ -39,6 +39,7 @@ python -m http.server 8080
   - `DIFY_BASE_URL`
   - `DIFY_API_KEY`
   - `JWT_SECRET`
+  - `SMS_PROVIDER`（生产建议 `tencent`）
   - `CORS_ORIGIN`（设为前端域名）
 
 ## 安全

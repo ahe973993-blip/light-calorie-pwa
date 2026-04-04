@@ -1,4 +1,4 @@
-const CACHE_NAME = "light-calorie-pwa-v5";
+const CACHE_NAME = "light-calorie-pwa-v8";
 const APP_SHELL = [
   "./",
   "./index.html",

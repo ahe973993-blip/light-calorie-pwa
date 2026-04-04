@@ -1,10 +1,7 @@
 const DEFAULT_PUBLIC_PROXY_BASES = [
-  "https://5bf3fc17e5abb1.lhr.life",
-  "https://5712b1106fa139.lhr.life",
-  "https://2d5fa82986c410.lhr.life",
-  "https://0b0b06ae9359d4.lhr.life",
-  "https://light-calorie-ai-proxy.loca.lt",
-  "https://ahe973993calorieproxyx.loca.lt",
+  "https://6703b1682b869d.lhr.life",
+  "https://b05ef8c6b09ae4.lhr.life",
+  "https://light-calorie-proxy.onrender.com",
 ];
 const API_BASE_STORAGE_KEY = "xhs_api_base_v3";
 const API_BASE_CANDIDATES = buildApiBaseCandidates();
@@ -210,9 +207,9 @@ function bindAuthEvents() {
 async function probeBackendHealth() {
   try {
     await apiJson("/api/health", { method: "GET" });
-    setAuthTip("后端连接正常，请先发送验证码再登录。");
+    setAuthTip(`后端连接正常（${activeApiBase}），请先发送验证码再登录。`);
   } catch {
-    setAuthTip("后端暂不可用，请在网址后追加 ?api_base=你的后端地址 后重试。", true);
+    setAuthTip("后端暂不可用。请使用 ?api_base=https://你的后端域名 打开页面。", true);
   }
 }
 
@@ -501,6 +498,10 @@ async function requestApi(pathname, init) {
   let lastNetworkError = null;
   const candidates = [activeApiBase, ...API_BASE_CANDIDATES.filter((base) => base !== activeApiBase)];
 
+  if (!candidates.length) {
+    throw new Error("未配置后端地址。请使用 ?api_base=https://你的后端域名 打开页面。");
+  }
+
   for (const base of candidates) {
     tried.push(base);
     try {
@@ -515,7 +516,9 @@ async function requestApi(pathname, init) {
       } finally {
         clearTimeout(timeoutId);
       }
-      if ([404, 502, 503, 504].includes(response.status)) {
+      const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+      const isHtml405 = response.status === 405 && contentType.includes("text/html");
+      if ([404, 502, 503, 504].includes(response.status) || isHtml405) {
         continue;
       }
 
@@ -576,6 +579,13 @@ function extractReportFromProxy(proxyData) {
 
 function extractError(data) {
   if (!data) return "未知错误";
+  if (typeof data?.raw === "string") {
+    const raw = data.raw.toLowerCase();
+    if (raw.includes("<html") || raw.includes("<!doctype")) {
+      return "后端地址不可用或接口未开放，请检查 api_base 是否正确。";
+    }
+    return data.raw;
+  }
   return data?.message || data?.error || data?.detail || JSON.stringify(data);
 }
 
@@ -883,8 +893,10 @@ function buildApiBaseCandidates() {
     pushBase(list, "http://localhost:8787");
   }
 
-  pushBase(list, window.location.origin);
-  return list.length ? list : [window.location.origin];
+  if (!window.location.hostname.endsWith("github.io")) {
+    pushBase(list, window.location.origin);
+  }
+  return list.length ? list : [];
 }
 
 function pushBase(list, value) {

@@ -21,8 +21,18 @@ cp .env.example .env
 - `DIFY_BASE_URL=https://api.dify.ai/v1`
 - `DIFY_API_KEY=你的Dify应用API_KEY`
 - `JWT_SECRET=长随机字符串`
-- `SMS_PROVIDER=mock`
+- `SMS_PROVIDER=mock|tencent`
 - `DB_PATH=./data/store.json`
+
+真实短信（腾讯云）：
+- `SMS_PROVIDER=tencent`
+- `TENCENT_SMS_SECRET_ID`
+- `TENCENT_SMS_SECRET_KEY`
+- `TENCENT_SMS_APP_ID`
+- `TENCENT_SMS_SIGN_NAME`
+- `TENCENT_SMS_TEMPLATE_ID`
+- `TENCENT_SMS_REGION=ap-guangzhou`
+- `TENCENT_SMS_TEMPLATE_PARAM_MODE=code_only`（或 `code_and_minutes`）
 
 ## 2) 安装依赖并启动
 ```bash
@@ -53,3 +63,4 @@ npm start
 - `DIFY_API_KEY`、`JWT_SECRET` 必须只放后端。
 - 生产把 `CORS_ORIGIN` 限制为你的前端域名。
 - 为登录和提交接口增加限流、防刷。
+- 生产必须关闭 `SMS_DEBUG_RETURN_CODE`，避免把验证码回传给前端。

@@ -27,12 +27,29 @@ const TOKEN_EXPIRES_IN = String(process.env.TOKEN_EXPIRES_IN || "30d").trim();
 const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, "data", "store.json"));
 
 const SMS_PROVIDER = String(process.env.SMS_PROVIDER || "mock").trim().toLowerCase();
+const SMS_CODE_TTL_SEC = clampInt(Number(process.env.SMS_CODE_TTL_SEC || 300), 60, 1800, 300);
+const SMS_COOLDOWN_SEC = clampInt(Number(process.env.SMS_COOLDOWN_SEC || 60), 10, 600, 60);
+const SMS_DAILY_LIMIT = clampInt(Number(process.env.SMS_DAILY_LIMIT || 15), 1, 100, 15);
+const SMS_DEBUG_RETURN_CODE = String(process.env.SMS_DEBUG_RETURN_CODE || "").trim() === "true";
+
+const TENCENT_SMS_SECRET_ID = String(process.env.TENCENT_SMS_SECRET_ID || "").trim();
+const TENCENT_SMS_SECRET_KEY = String(process.env.TENCENT_SMS_SECRET_KEY || "").trim();
+const TENCENT_SMS_APP_ID = String(process.env.TENCENT_SMS_APP_ID || "").trim();
+const TENCENT_SMS_SIGN_NAME = String(process.env.TENCENT_SMS_SIGN_NAME || "").trim();
+const TENCENT_SMS_TEMPLATE_ID = String(process.env.TENCENT_SMS_TEMPLATE_ID || "").trim();
+const TENCENT_SMS_REGION = String(process.env.TENCENT_SMS_REGION || "ap-guangzhou").trim();
+const TENCENT_SMS_TEMPLATE_PARAM_MODE = String(process.env.TENCENT_SMS_TEMPLATE_PARAM_MODE || "code_only")
+  .trim()
+  .toLowerCase();
 
 if (!DIFY_API_KEY) {
   console.warn("[WARN] DIFY_API_KEY is empty. Proxy calls will fail until you set it in .env");
 }
 if (JWT_SECRET === "change-this-jwt-secret") {
   console.warn("[WARN] JWT_SECRET uses default value. Please set JWT_SECRET in production.");
+}
+if (!isSmsProviderReady()) {
+  console.warn(`[WARN] SMS provider is not fully configured. provider=${SMS_PROVIDER}`);
 }
 
 const EMPTY_DB = {
@@ -45,6 +62,7 @@ let saveQueue = Promise.resolve();
 
 const smsCodeStore = new Map();
 const smsSendAtStore = new Map();
+const smsDailyCountStore = new Map();
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(morgan("dev"));
@@ -82,40 +100,66 @@ app.get("/api/health", (req, res) => {
     users: db.users.length,
     records: db.meal_records.length,
     sms_provider: SMS_PROVIDER,
+    sms_provider_ready: isSmsProviderReady(),
+    sms_code_ttl_sec: SMS_CODE_TTL_SEC,
+    sms_cooldown_sec: SMS_COOLDOWN_SEC,
+    sms_daily_limit: SMS_DAILY_LIMIT,
   });
 });
 
 app.post("/api/auth/sms/send", async (req, res) => {
-  const phone = normalizePhone(req.body?.phone);
-  if (!isValidPhone(phone)) {
-    return res.status(400).json({ message: "请输入正确的手机号" });
+  try {
+    const phone = normalizePhone(req.body?.phone);
+    if (!isValidPhone(phone)) {
+      return res.status(400).json({ message: "请输入正确的手机号" });
+    }
+
+    if (!isSmsProviderReady()) {
+      return res.status(500).json({ message: "短信服务未配置完成，请联系管理员" });
+    }
+
+    const now = Date.now();
+    const lastSentAt = smsSendAtStore.get(phone) || 0;
+    const cooldownMs = SMS_COOLDOWN_SEC * 1000;
+    if (now - lastSentAt < cooldownMs) {
+      const retrySec = Math.ceil((cooldownMs - (now - lastSentAt)) / 1000);
+      return res.status(429).json({ message: `请求过于频繁，请 ${retrySec}s 后重试` });
+    }
+
+    const dateKey = localDateKey(new Date(now));
+    const dailyCountKey = `${dateKey}:${phone}`;
+    const sentToday = Number(smsDailyCountStore.get(dailyCountKey) || 0);
+    if (sentToday >= SMS_DAILY_LIMIT) {
+      return res.status(429).json({ message: "该手机号今日验证码次数已达上限，请明天再试" });
+    }
+
+    const code = generateSmsCode();
+    smsCodeStore.set(phone, {
+      code,
+      expires_at: now + SMS_CODE_TTL_SEC * 1000,
+    });
+    smsSendAtStore.set(phone, now);
+    smsDailyCountStore.set(dailyCountKey, sentToday + 1);
+
+    await sendSmsByProvider({ phone, code });
+
+    if (SMS_PROVIDER === "mock" || SMS_DEBUG_RETURN_CODE) {
+      return res.json({
+        ok: true,
+        message: "验证码已发送",
+        expires_in_sec: SMS_CODE_TTL_SEC,
+        dev_code: code,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      message: "验证码已发送",
+      expires_in_sec: SMS_CODE_TTL_SEC,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: errorMessage(error) });
   }
-
-  const now = Date.now();
-  const lastSentAt = smsSendAtStore.get(phone) || 0;
-  const cooldownMs = 60 * 1000;
-  if (now - lastSentAt < cooldownMs) {
-    const retrySec = Math.ceil((cooldownMs - (now - lastSentAt)) / 1000);
-    return res.status(429).json({ message: `请求过于频繁，请 ${retrySec}s 后重试` });
-  }
-
-  const code = generateSmsCode();
-  smsCodeStore.set(phone, {
-    code,
-    expires_at: now + 5 * 60 * 1000,
-  });
-  smsSendAtStore.set(phone, now);
-
-  if (SMS_PROVIDER !== "mock") {
-    console.warn(`[WARN] SMS_PROVIDER=${SMS_PROVIDER} not implemented, fallback to mock mode`);
-  }
-
-  return res.json({
-    ok: true,
-    message: "验证码已发送",
-    expires_in_sec: 300,
-    dev_code: code,
-  });
 });
 
 app.post("/api/auth/phone/login", async (req, res) => {
@@ -515,6 +559,75 @@ function isValidPhone(phone) {
 
 function generateSmsCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function isSmsProviderReady() {
+  if (SMS_PROVIDER === "mock") return true;
+  if (SMS_PROVIDER === "tencent") {
+    return Boolean(
+      TENCENT_SMS_SECRET_ID &&
+        TENCENT_SMS_SECRET_KEY &&
+        TENCENT_SMS_APP_ID &&
+        TENCENT_SMS_SIGN_NAME &&
+        TENCENT_SMS_TEMPLATE_ID
+    );
+  }
+  return false;
+}
+
+async function sendSmsByProvider({ phone, code }) {
+  if (SMS_PROVIDER === "mock") {
+    console.log(`[sms][mock] phone=${phone} code=${code}`);
+    return;
+  }
+  if (SMS_PROVIDER === "tencent") {
+    await sendSmsByTencent({ phone, code });
+    return;
+  }
+  throw new Error(`不支持的短信服务提供商: ${SMS_PROVIDER}`);
+}
+
+async function sendSmsByTencent({ phone, code }) {
+  let sdk;
+  try {
+    sdk = require("tencentcloud-sdk-nodejs-sms");
+  } catch {
+    throw new Error("未安装腾讯云短信 SDK，请执行 npm install");
+  }
+
+  const SmsClient = sdk.sms.v20210111.Client;
+  const client = new SmsClient({
+    credential: {
+      secretId: TENCENT_SMS_SECRET_ID,
+      secretKey: TENCENT_SMS_SECRET_KEY,
+    },
+    region: TENCENT_SMS_REGION,
+    profile: {
+      httpProfile: {
+        endpoint: "sms.tencentcloudapi.com",
+      },
+    },
+  });
+
+  const ttlMinutes = Math.ceil(SMS_CODE_TTL_SEC / 60);
+  const templateParamSet =
+    TENCENT_SMS_TEMPLATE_PARAM_MODE === "code_and_minutes" ? [code, String(ttlMinutes)] : [code];
+
+  const params = {
+    SmsSdkAppId: TENCENT_SMS_APP_ID,
+    SignName: TENCENT_SMS_SIGN_NAME,
+    TemplateId: TENCENT_SMS_TEMPLATE_ID,
+    TemplateParamSet: templateParamSet,
+    PhoneNumberSet: [`+86${phone}`],
+    SessionContext: "light-calorie-login",
+  };
+
+  const resp = await client.SendSms(params);
+  const status = Array.isArray(resp?.SendStatusSet) ? resp.SendStatusSet[0] : null;
+  if (!status || String(status.Code || "") !== "Ok") {
+    const detail = status ? `${status.Code || "Unknown"} ${status.Message || ""}`.trim() : JSON.stringify(resp);
+    throw new Error(`短信发送失败: ${detail}`);
+  }
 }
 
 function normalizeDateKey(value) {

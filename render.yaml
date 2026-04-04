@@ -25,3 +25,25 @@
         value: ./data/store.json
       - key: SMS_PROVIDER
         value: mock
+      - key: SMS_CODE_TTL_SEC
+        value: 300
+      - key: SMS_COOLDOWN_SEC
+        value: 60
+      - key: SMS_DAILY_LIMIT
+        value: 15
+      - key: SMS_DEBUG_RETURN_CODE
+        value: false
+      - key: TENCENT_SMS_SECRET_ID
+        sync: false
+      - key: TENCENT_SMS_SECRET_KEY
+        sync: false
+      - key: TENCENT_SMS_APP_ID
+        sync: false
+      - key: TENCENT_SMS_SIGN_NAME
+        sync: false
+      - key: TENCENT_SMS_TEMPLATE_ID
+        sync: false
+      - key: TENCENT_SMS_REGION
+        value: ap-guangzhou
+      - key: TENCENT_SMS_TEMPLATE_PARAM_MODE
+        value: code_only

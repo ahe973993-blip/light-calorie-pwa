@@ -45,3 +45,4 @@ python -m http.server 8080
 ## 注意
 - 页面已固定走后端代理，不再显示 API Key / Base URL 配置。
 - 若前端与后端不在同一域名，可通过 URL 参数 `?api_base=https://你的后端域名` 指定后端地址。
+- 若未配置 `api_base` 且默认后端不可用，页面不会再回退到 GitHub 域名（避免 405 假错误）。
