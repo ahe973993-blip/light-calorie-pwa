@@ -16,7 +16,7 @@ const weightSummaryEl = document.getElementById("weight-summary");
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
 const timelineStorageKey = "xhs_meal_timeline_v2";
 const legacyTimelineStorageKey = "xhs_meal_timeline_v1";
-const PROXY_BASE_URL = "https://light-calorie-ai-proxy.loca.lt";
+const PROXY_BASE_URL = "https://ahe973993-calorie-proxy-20260404.loca.lt";
 const API_USER_ID = "xhs-web-user";
 
 registerServiceWorker();
