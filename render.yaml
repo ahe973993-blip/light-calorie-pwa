@@ -23,13 +23,5 @@
         value: 30d
       - key: DB_PATH
         value: ./data/store.json
-      - key: FRONTEND_ORIGIN
-        value: https://ahe973993-blip.github.io/light-calorie-pwa/
       - key: SMS_PROVIDER
         value: mock
-      - key: WECHAT_APP_ID
-        sync: false
-      - key: WECHAT_APP_SECRET
-        sync: false
-      - key: WECHAT_CALLBACK_URL
-        sync: false

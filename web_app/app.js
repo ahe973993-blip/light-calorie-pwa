@@ -1,4 +1,13 @@
-﻿const PROXY_BASE_URL = "https://ahe973993calorieproxyx.loca.lt";
+const DEFAULT_PUBLIC_PROXY_BASES = [
+  "https://5712b1106fa139.lhr.life",
+  "https://2d5fa82986c410.lhr.life",
+  "https://0b0b06ae9359d4.lhr.life",
+  "https://light-calorie-ai-proxy.loca.lt",
+  "https://ahe973993calorieproxyx.loca.lt",
+];
+const API_BASE_STORAGE_KEY = "xhs_api_base_v3";
+const API_BASE_CANDIDATES = buildApiBaseCandidates();
+let activeApiBase = API_BASE_CANDIDATES[0];
 
 const AUTH_TOKEN_KEY = "xhs_auth_token_v2";
 const AUTH_USER_KEY = "xhs_auth_user_v2";
@@ -28,7 +37,6 @@ const authUserNameEl = document.getElementById("auth-user-name");
 
 const phoneLoginForm = document.getElementById("phone-login-form");
 const sendCodeBtn = document.getElementById("send-code-btn");
-const wechatLoginBtn = document.getElementById("wechat-login-btn");
 const logoutBtn = document.getElementById("logout-btn");
 
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
@@ -47,7 +55,7 @@ restoreAuthFromStorage();
 applyAuthState();
 hydrateTimelineFromCache();
 renderTimeline();
-handleWechatReturnToken();
+probeBackendHealth();
 
 if (authToken) {
   restoreSessionAndSync();
@@ -83,7 +91,6 @@ form.addEventListener("submit", async (event) => {
     }
 
     const runData = await runWorkflowViaProxy({
-      proxyUrl: PROXY_BASE_URL,
       values,
       files: selectedFiles,
       token: authToken,
@@ -163,6 +170,10 @@ function bindAuthEvents() {
     }
 
     try {
+      if (sendCodeBtn) {
+        sendCodeBtn.disabled = true;
+        sendCodeBtn.textContent = "发送中...";
+      }
       setAuthTip("正在发送验证码...");
       const data = await apiJson("/api/auth/sms/send", {
         method: "POST",
@@ -178,21 +189,11 @@ function bindAuthEvents() {
       startSendCodeCooldown(60);
     } catch (error) {
       setAuthTip(errorMessage(error), true);
-    }
-  });
-
-  wechatLoginBtn?.addEventListener("click", async () => {
-    try {
-      const redirectUri = window.location.href.split("#")[0];
-      const data = await apiJson(`/api/auth/wechat/url?redirect_uri=${encodeURIComponent(redirectUri)}`, {
-        method: "GET",
-      });
-      if (!data?.auth_url) {
-        throw new Error("微信登录暂不可用，请先用手机号登录");
+      renderSendCodeBtn();
+    } finally {
+      if (sendCodeCooldown <= 0) {
+        renderSendCodeBtn();
       }
-      window.location.href = data.auth_url;
-    } catch (error) {
-      setAuthTip(errorMessage(error), true);
     }
   });
 
@@ -205,27 +206,13 @@ function bindAuthEvents() {
   });
 }
 
-function handleWechatReturnToken() {
-  const url = new URL(window.location.href);
-  const token = url.searchParams.get("auth_token");
-  const nickname = url.searchParams.get("nickname");
-  const uid = url.searchParams.get("uid");
-
-  if (!token) return;
-
-  const user = {
-    id: uid || "wechat-user",
-    nickname: nickname || "微信用户",
-  };
-
-  setSession(token, user);
-  applyAuthState();
-  restoreSessionAndSync();
-
-  url.searchParams.delete("auth_token");
-  url.searchParams.delete("nickname");
-  url.searchParams.delete("uid");
-  window.history.replaceState({}, "", url.toString());
+async function probeBackendHealth() {
+  try {
+    await apiJson("/api/health", { method: "GET" });
+    setAuthTip("后端连接正常，请先发送验证码再登录。");
+  } catch {
+    setAuthTip("后端暂不可用，请在网址后追加 ?api_base=你的后端地址 后重试。", true);
+  }
 }
 
 async function restoreSessionAndSync() {
@@ -449,7 +436,7 @@ function setStatus(text, isError = false) {
   statusText.style.color = isError ? "#cf1634" : "#6f7280";
 }
 
-async function runWorkflowViaProxy({ proxyUrl, values, files, token }) {
+async function runWorkflowViaProxy({ values, files, token }) {
   const fd = new FormData();
   fd.append("date_key", toDateKeyLocal(new Date()));
   fd.append("height_cm", String(values.height_cm || ""));
@@ -465,11 +452,10 @@ async function runWorkflowViaProxy({ proxyUrl, values, files, token }) {
   fd.append("lunch_image", files.lunch_image);
   fd.append("dinner_image", files.dinner_image);
 
-  const response = await fetch(`${proxyUrl}/api/nutrition/run`, {
+  const response = await requestApi("/api/nutrition/run", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
-      "bypass-tunnel-reminder": "true",
     },
     body: fd,
   });
@@ -483,9 +469,7 @@ async function runWorkflowViaProxy({ proxyUrl, values, files, token }) {
 }
 
 async function apiJson(pathname, { method = "GET", body = null, auth = false } = {}) {
-  const headers = {
-    "bypass-tunnel-reminder": "true",
-  };
+  const headers = {};
 
   if (body && !(body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
@@ -497,7 +481,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
     headers.Authorization = `Bearer ${authToken}`;
   }
 
-  const response = await fetch(`${PROXY_BASE_URL}${pathname}`, {
+  const response = await requestApi(pathname, {
     method,
     headers,
     body,
@@ -509,6 +493,49 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
   }
 
   return data;
+}
+
+async function requestApi(pathname, init) {
+  const tried = [];
+  let lastNetworkError = null;
+  const candidates = [activeApiBase, ...API_BASE_CANDIDATES.filter((base) => base !== activeApiBase)];
+
+  for (const base of candidates) {
+    tried.push(base);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      let response;
+      try {
+        response = await fetch(`${base}${pathname}`, {
+          ...init,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+      if ([404, 502, 503, 504].includes(response.status)) {
+        continue;
+      }
+
+      if (activeApiBase !== base) {
+        activeApiBase = base;
+        persistApiBase(base);
+      }
+      return response;
+    } catch (error) {
+      lastNetworkError = error;
+      if (error?.name === "AbortError") {
+        continue;
+      }
+    }
+  }
+
+  if (lastNetworkError) {
+    throw new Error(`无法连接后端服务。请在网址后追加 ?api_base=你的后端地址 。已尝试：${tried.join(" , ")}`);
+  }
+
+  throw new Error(`后端服务不可用。请在网址后追加 ?api_base=你的后端地址 。已尝试：${tried.join(" , ")}`);
 }
 
 function extractReport(runData) {
@@ -829,6 +856,51 @@ function registerServiceWorker() {
       window.location.reload();
     });
   });
+}
+
+function buildApiBaseCandidates() {
+  const list = [];
+  const fromGlobal = normalizeBaseUrl(String(window.__CALORIE_API_BASE__ || ""));
+  const fromQuery = normalizeBaseUrl(new URL(window.location.href).searchParams.get("api_base") || "");
+
+  let fromStorage = "";
+  try {
+    fromStorage = normalizeBaseUrl(String(localStorage.getItem(API_BASE_STORAGE_KEY) || ""));
+  } catch {
+    fromStorage = "";
+  }
+
+  pushBase(list, fromGlobal);
+  pushBase(list, fromQuery);
+  pushBase(list, fromStorage);
+  for (const base of DEFAULT_PUBLIC_PROXY_BASES) {
+    pushBase(list, base);
+  }
+
+  if (["localhost", "127.0.0.1"].includes(window.location.hostname)) {
+    pushBase(list, "http://127.0.0.1:8787");
+    pushBase(list, "http://localhost:8787");
+  }
+
+  pushBase(list, window.location.origin);
+  return list.length ? list : [window.location.origin];
+}
+
+function pushBase(list, value) {
+  if (!value) return;
+  if (!list.includes(value)) {
+    list.push(value);
+  }
+}
+
+function normalizeBaseUrl(url) {
+  return String(url || "").trim().replace(/\/$/, "");
+}
+
+function persistApiBase(base) {
+  try {
+    localStorage.setItem(API_BASE_STORAGE_KEY, base);
+  } catch {}
 }
 
 async function safeReadJson(response) {

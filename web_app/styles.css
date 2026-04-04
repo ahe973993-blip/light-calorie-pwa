@@ -159,7 +159,7 @@ body {
 
 .auth-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -197,8 +197,7 @@ body {
   align-items: end;
 }
 
-.ghost-btn,
-.wechat-btn {
+.ghost-btn {
   border: 1px solid #d8dceb;
   border-radius: 12px;
   background: #fff;
@@ -209,15 +208,8 @@ body {
   cursor: pointer;
 }
 
-.ghost-btn:hover,
-.wechat-btn:hover {
+.ghost-btn:hover {
   border-color: #c5cae0;
-}
-
-.wechat-btn {
-  background: #ebfff3;
-  border-color: #b7ebcb;
-  color: #178a4b;
 }
 
 .form-section {

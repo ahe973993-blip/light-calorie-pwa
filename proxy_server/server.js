@@ -26,12 +26,6 @@ const JWT_SECRET = String(process.env.JWT_SECRET || "").trim() || "change-this-j
 const TOKEN_EXPIRES_IN = String(process.env.TOKEN_EXPIRES_IN || "30d").trim();
 const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, "data", "store.json"));
 
-const DEFAULT_FRONTEND_ORIGIN = String(
-  process.env.FRONTEND_ORIGIN || "https://ahe973993-blip.github.io/light-calorie-pwa/"
-).trim();
-const WECHAT_APP_ID = String(process.env.WECHAT_APP_ID || "").trim();
-const WECHAT_APP_SECRET = String(process.env.WECHAT_APP_SECRET || "").trim();
-const WECHAT_CALLBACK_URL = String(process.env.WECHAT_CALLBACK_URL || "").trim();
 const SMS_PROVIDER = String(process.env.SMS_PROVIDER || "mock").trim().toLowerCase();
 
 if (!DIFY_API_KEY) {
@@ -88,7 +82,6 @@ app.get("/api/health", (req, res) => {
     users: db.users.length,
     records: db.meal_records.length,
     sms_provider: SMS_PROVIDER,
-    wechat_enabled: Boolean(WECHAT_APP_ID && WECHAT_APP_SECRET && WECHAT_CALLBACK_URL),
   });
 });
 
@@ -157,7 +150,6 @@ app.post("/api/auth/phone/login", async (req, res) => {
       id: crypto.randomUUID(),
       phone,
       nickname: `用户${phone.slice(-4)}`,
-      wechat_openid: "",
       created_at: nowIso,
       updated_at: nowIso,
     };
@@ -167,112 +159,6 @@ app.post("/api/auth/phone/login", async (req, res) => {
 
   const token = signToken(user);
   return res.json({ ok: true, token, user: publicUser(user) });
-});
-
-app.get("/api/auth/wechat/url", (req, res) => {
-  if (!WECHAT_APP_ID || !WECHAT_APP_SECRET || !WECHAT_CALLBACK_URL) {
-    return res.status(501).json({ message: "微信登录未配置，请先使用手机号登录" });
-  }
-
-  const redirectUri = safeRedirectUri(req.query?.redirect_uri);
-  const state = jwt.sign({ redirect_uri: redirectUri }, JWT_SECRET, { expiresIn: "10m" });
-
-  const authUrl =
-    "https://open.weixin.qq.com/connect/oauth2/authorize" +
-    `?appid=${encodeURIComponent(WECHAT_APP_ID)}` +
-    `&redirect_uri=${encodeURIComponent(WECHAT_CALLBACK_URL)}` +
-    "&response_type=code" +
-    "&scope=snsapi_userinfo" +
-    `&state=${encodeURIComponent(state)}` +
-    "#wechat_redirect";
-
-  return res.json({ ok: true, auth_url: authUrl });
-});
-
-app.get("/api/auth/wechat/callback", async (req, res) => {
-  if (!WECHAT_APP_ID || !WECHAT_APP_SECRET || !WECHAT_CALLBACK_URL) {
-    return res.status(501).send("微信登录未配置");
-  }
-
-  try {
-    const code = String(req.query?.code || "").trim();
-    const stateRaw = String(req.query?.state || "").trim();
-
-    if (!code || !stateRaw) {
-      return res.status(400).send("微信回调参数缺失");
-    }
-
-    let redirectUri = DEFAULT_FRONTEND_ORIGIN;
-    try {
-      const state = jwt.verify(stateRaw, JWT_SECRET);
-      redirectUri = safeRedirectUri(state.redirect_uri);
-    } catch {
-      redirectUri = DEFAULT_FRONTEND_ORIGIN;
-    }
-
-    const tokenUrl =
-      "https://api.weixin.qq.com/sns/oauth2/access_token" +
-      `?appid=${encodeURIComponent(WECHAT_APP_ID)}` +
-      `&secret=${encodeURIComponent(WECHAT_APP_SECRET)}` +
-      `&code=${encodeURIComponent(code)}` +
-      "&grant_type=authorization_code";
-
-    const tokenResp = await fetch(tokenUrl);
-    const tokenData = await safeJson(tokenResp);
-    if (!tokenResp.ok || tokenData?.errcode) {
-      throw new Error(`微信授权失败: ${tokenData?.errmsg || tokenResp.status}`);
-    }
-
-    const accessToken = String(tokenData.access_token || "");
-    const openid = String(tokenData.openid || "");
-    if (!accessToken || !openid) {
-      throw new Error("微信授权返回数据不完整");
-    }
-
-    const profileUrl =
-      "https://api.weixin.qq.com/sns/userinfo" +
-      `?access_token=${encodeURIComponent(accessToken)}` +
-      `&openid=${encodeURIComponent(openid)}` +
-      "&lang=zh_CN";
-
-    const profileResp = await fetch(profileUrl);
-    const profileData = await safeJson(profileResp);
-    if (!profileResp.ok || profileData?.errcode) {
-      throw new Error(`微信用户信息获取失败: ${profileData?.errmsg || profileResp.status}`);
-    }
-
-    let user = findUserByWechatOpenid(openid);
-    const nowIso = new Date().toISOString();
-    const nickname = String(profileData.nickname || "微信用户").trim() || "微信用户";
-
-    if (!user) {
-      user = {
-        id: crypto.randomUUID(),
-        phone: "",
-        nickname,
-        wechat_openid: openid,
-        created_at: nowIso,
-        updated_at: nowIso,
-      };
-      db.users.push(user);
-    } else {
-      user.nickname = nickname;
-      user.updated_at = nowIso;
-    }
-
-    await saveDB();
-
-    const authToken = signToken(user);
-    const target = appendQuery(redirectUri, {
-      auth_token: authToken,
-      uid: user.id,
-      nickname: user.nickname,
-    });
-
-    return res.redirect(target);
-  } catch (error) {
-    return res.status(500).send(errorMessage(error));
-  }
 });
 
 app.get("/api/auth/me", requireAuth, (req, res) => {
@@ -483,16 +369,11 @@ function findUserByPhone(phone) {
   return db.users.find((item) => item.phone === phone);
 }
 
-function findUserByWechatOpenid(openid) {
-  return db.users.find((item) => item.wechat_openid === openid);
-}
-
 function publicUser(user) {
   return {
     id: user.id,
     phone: user.phone,
     nickname: user.nickname,
-    has_wechat: Boolean(user.wechat_openid),
     created_at: user.created_at,
   };
 }
@@ -651,38 +532,6 @@ function localDateKey(date) {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-function safeRedirectUri(input) {
-  const fallback = normalizeBaseUrl(DEFAULT_FRONTEND_ORIGIN) || "https://ahe973993-blip.github.io/light-calorie-pwa/";
-  try {
-    const url = new URL(String(input || fallback));
-    if (!["http:", "https:"].includes(url.protocol)) {
-      return fallback;
-    }
-
-    const allow = normalizeBaseUrl(process.env.FRONTEND_ORIGIN || "");
-    if (allow) {
-      const allowUrl = new URL(allow);
-      if (url.origin !== allowUrl.origin) {
-        return allow;
-      }
-    }
-
-    return url.toString();
-  } catch {
-    return fallback;
-  }
-}
-
-function appendQuery(url, params) {
-  const parsed = new URL(url);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      parsed.searchParams.set(key, String(value));
-    }
-  });
-  return parsed.toString();
 }
 
 function clampInt(value, min, max, fallback) {

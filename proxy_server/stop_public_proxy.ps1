@@ -1,6 +1,7 @@
-﻿Get-CimInstance Win32_Process |
+Get-CimInstance Win32_Process |
   Where-Object {
-    $_.Name -in @('cmd.exe', 'node.exe') -and (
+    $_.Name -in @('ssh.exe', 'cmd.exe', 'node.exe') -and (
+      [string]$_.CommandLine -match 'localhost\.run' -or
       [string]$_.CommandLine -match 'localtunnel' -or
       [string]$_.CommandLine -match '\blt --port 8787\b' -or
       [string]$_.CommandLine -match 'npx-cli\.js.*localtunnel' -or

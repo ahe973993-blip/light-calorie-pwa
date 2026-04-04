@@ -4,7 +4,6 @@
 - 前端只请求代理，不暴露 Dify API Key
 - 后端统一负责：
   - 手机号验证码登录
-  - 微信 OAuth 登录（可选）
   - 运行 Dify 工作流
   - 按用户保存饮食记录（云端同步）
 
@@ -22,14 +21,8 @@ cp .env.example .env
 - `DIFY_BASE_URL=https://api.dify.ai/v1`
 - `DIFY_API_KEY=你的Dify应用API_KEY`
 - `JWT_SECRET=长随机字符串`
-- `FRONTEND_ORIGIN=https://你的前端域名`
 - `SMS_PROVIDER=mock`
 - `DB_PATH=./data/store.json`
-
-微信登录（可选）：
-- `WECHAT_APP_ID`
-- `WECHAT_APP_SECRET`
-- `WECHAT_CALLBACK_URL`
 
 ## 2) 安装依赖并启动
 ```bash
@@ -46,8 +39,6 @@ npm start
 ### 鉴权
 - `POST /api/auth/sms/send` 发送验证码
 - `POST /api/auth/phone/login` 手机号登录
-- `GET /api/auth/wechat/url` 获取微信授权链接
-- `GET /api/auth/wechat/callback` 微信回调
 - `GET /api/auth/me` 获取当前用户
 
 ### 记录
