@@ -9,52 +9,59 @@
     <title>轻卡小记 | AI 营养师</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260404a" />
+    <link rel="stylesheet" href="./styles.css?v=20260404b" />
   </head>
   <body>
     <div class="bg-blur bg-blur-a"></div>
     <div class="bg-blur bg-blur-b"></div>
     <main class="page">
-      <header class="hero reveal">
-        <div class="brand-pill">小红书风格 · AI 饮食助手</div>
-        <h1>轻卡小记</h1>
-        <p>上传三餐图片，填写克重和体征信息，一键拿到今日热量报告。</p>
-      </header>
+      <section id="login-page" class="login-page">
+        <header class="hero reveal">
+          <h1>轻卡小记</h1>
+          <p>先登录账号，再开始记录你的每日饮食。</p>
+        </header>
 
-      <section class="card auth-card reveal" id="auth-card">
-        <div class="card-title-row">
-          <h2>账号同步</h2>
-          <span id="auth-status-chip" class="chip">未登录</span>
-        </div>
-        <p id="auth-tip" class="timeline-hint">登录后可跨设备同步你的饮食记录。</p>
-
-        <div id="auth-logged-out" class="auth-grid">
-          <form id="email-login-form" class="auth-form">
-            <h3>邮箱验证码登录</h3>
-            <label>
-              邮箱
-              <input name="email" type="email" inputmode="email" placeholder="请输入邮箱地址" required />
-            </label>
-            <div class="code-row">
-              <label>
-                验证码
-                <input name="code" type="text" inputmode="numeric" placeholder="6位验证码" required />
-              </label>
-              <button id="send-code-btn" type="button" class="ghost-btn">发送验证码</button>
-            </div>
-            <button class="submit-btn" type="submit">邮箱登录</button>
-          </form>
-        </div>
-
-        <div id="auth-logged-in" class="auth-user" hidden>
-          <div>
-            当前账号：<strong id="auth-user-name">-</strong>
+        <section class="card auth-card reveal" id="auth-card">
+          <div class="card-title-row">
+            <h2>账号同步</h2>
+            <span id="auth-status-chip" class="chip">未登录</span>
           </div>
-          <button id="logout-btn" type="button" class="ghost-btn">退出登录</button>
-        </div>
+          <p id="auth-tip" class="timeline-hint">登录后可跨设备同步你的饮食记录。</p>
+
+          <div id="auth-logged-out" class="auth-grid">
+            <form id="email-login-form" class="auth-form">
+              <h3>邮箱验证码登录</h3>
+              <label>
+                邮箱
+                <input name="email" type="email" inputmode="email" placeholder="请输入邮箱地址" required />
+              </label>
+              <div class="code-row">
+                <label>
+                  验证码
+                  <input name="code" type="text" inputmode="numeric" placeholder="6位验证码" required />
+                </label>
+                <button id="send-code-btn" type="button" class="ghost-btn">发送验证码</button>
+              </div>
+              <button class="submit-btn" type="submit">邮箱登录</button>
+            </form>
+          </div>
+        </section>
       </section>
 
-      <section class="grid">
+      <section id="app-page" class="app-page" hidden>
+        <header class="hero reveal">
+          <h1>轻卡小记</h1>
+          <p>上传三餐图片，填写克重和体征信息，一键拿到今日热量报告。</p>
+        </header>
+
+        <section class="card app-account-bar reveal">
+          <div>
+            当前账号：<strong id="app-user-name">-</strong>
+          </div>
+          <button id="app-logout-btn" type="button" class="ghost-btn">退出登录</button>
+        </section>
+
+        <section class="grid">
         <form id="nutrition-form" class="card form-card reveal" novalidate>
           <div class="card-title-row">
             <h2>今日记录</h2>
@@ -171,7 +178,7 @@
         </aside>
       </section>
 
-      <section class="card timeline-card reveal">
+        <section class="card timeline-card reveal">
         <div class="card-title-row">
           <h2>饮食时间线</h2>
           <span id="timeline-count" class="chip">0 天记录</span>
@@ -184,7 +191,7 @@
         </div>
       </section>
 
-      <section class="stats-grid reveal">
+        <section class="stats-grid reveal">
         <article class="card stat-card">
           <div class="card-title-row">
             <h2>连续打卡</h2>
@@ -216,8 +223,9 @@
           </div>
         </article>
       </section>
+      </section>
     </main>
 
-    <script src="./app.js?v=20260404a" type="module"></script>
+    <script src="./app.js?v=20260404b" type="module"></script>
   </body>
 </html>

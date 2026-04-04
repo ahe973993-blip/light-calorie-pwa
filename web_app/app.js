@@ -10,6 +10,8 @@ let activeApiBase = API_BASE_CANDIDATES[0];
 const AUTH_TOKEN_KEY = "xhs_auth_token_v2";
 const AUTH_USER_KEY = "xhs_auth_user_v2";
 const TIMELINE_CACHE_PREFIX = "xhs_timeline_cache_v2";
+const PROFILE_DRAFT_STORAGE_KEY = "xhs_profile_draft_v1";
+const BASIC_PROFILE_FIELDS = ["height_cm", "weight_kg", "age", "gender", "activity_level"];
 
 const form = document.getElementById("nutrition-form");
 const submitBtn = document.getElementById("submit-btn");
@@ -30,12 +32,13 @@ const weightSummaryEl = document.getElementById("weight-summary");
 const authStatusChipEl = document.getElementById("auth-status-chip");
 const authTipEl = document.getElementById("auth-tip");
 const authLoggedOutEl = document.getElementById("auth-logged-out");
-const authLoggedInEl = document.getElementById("auth-logged-in");
-const authUserNameEl = document.getElementById("auth-user-name");
+const loginPageEl = document.getElementById("login-page");
+const appPageEl = document.getElementById("app-page");
+const appUserNameEl = document.getElementById("app-user-name");
 
 const emailLoginForm = document.getElementById("email-login-form");
 const sendCodeBtn = document.getElementById("send-code-btn");
-const logoutBtn = document.getElementById("logout-btn");
+const appLogoutBtn = document.getElementById("app-logout-btn");
 
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,6 +52,8 @@ let sendCodeTimer = null;
 removeLegacySettingsPanel();
 registerServiceWorker();
 initImagePreview();
+restoreProfileDraft();
+bindProfileDraftEvents();
 bindAuthEvents();
 restoreAuthFromStorage();
 applyAuthState();
@@ -150,6 +155,7 @@ function bindAuthEvents() {
       await fetchCloudRecords(false);
       setAuthTip("登录成功，已同步云端记录。");
       setStatus("已登录，可跨设备同步。", false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       setAuthTip(errorMessage(error), true);
     }
@@ -200,12 +206,14 @@ function bindAuthEvents() {
     }
   });
 
-  logoutBtn?.addEventListener("click", () => {
+  appLogoutBtn?.addEventListener("click", () => {
     clearSession();
     applyAuthState();
     timelineRecords = [];
     renderTimeline();
     setAuthTip("你已退出登录。");
+    setStatus("已退出登录。", false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 }
 
@@ -360,21 +368,17 @@ function setSession(token, user) {
 function applyAuthState() {
   const loggedIn = Boolean(authToken && currentUser);
 
-  if (authLoggedOutEl) authLoggedOutEl.hidden = loggedIn;
-  if (authLoggedInEl) authLoggedInEl.hidden = !loggedIn;
+  if (loginPageEl) loginPageEl.hidden = loggedIn;
+  if (appPageEl) appPageEl.hidden = !loggedIn;
+  if (authLoggedOutEl) authLoggedOutEl.hidden = false;
 
   if (authStatusChipEl) {
     authStatusChipEl.textContent = loggedIn ? "已登录" : "未登录";
     authStatusChipEl.classList.toggle("hot", loggedIn);
   }
 
-  if (authUserNameEl) {
-    if (!loggedIn) {
-      authUserNameEl.textContent = "-";
-    } else {
-      const nickname = currentUser.nickname || currentUser.email || "用户";
-      authUserNameEl.textContent = `${nickname}`;
-    }
+  if (appUserNameEl) {
+    appUserNameEl.textContent = loggedIn ? `${currentUser.nickname || currentUser.email || "用户"}` : "-";
   }
 
   setSubmitEnabled(loggedIn);
@@ -424,8 +428,52 @@ function renderSendCodeBtn() {
 }
 
 function collectValues() {
+  persistProfileDraft();
   const fd = new FormData(form);
   return Object.fromEntries(fd.entries());
+}
+
+function bindProfileDraftEvents() {
+  if (!form) return;
+  for (const name of BASIC_PROFILE_FIELDS) {
+    const field = form.elements[name];
+    if (!field) continue;
+    field.addEventListener("input", persistProfileDraft);
+    field.addEventListener("change", persistProfileDraft);
+  }
+}
+
+function restoreProfileDraft() {
+  if (!form) return;
+  try {
+    const raw = localStorage.getItem(PROFILE_DRAFT_STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return;
+
+    for (const name of BASIC_PROFILE_FIELDS) {
+      const field = form.elements[name];
+      const value = data[name];
+      if (!field || value === undefined || value === null) continue;
+      field.value = String(value);
+    }
+  } catch {}
+}
+
+function persistProfileDraft() {
+  if (!form) return;
+  const draft = {};
+  for (const name of BASIC_PROFILE_FIELDS) {
+    const field = form.elements[name];
+    if (!field) continue;
+    const value = String(field.value ?? "").trim();
+    if (value) {
+      draft[name] = value;
+    }
+  }
+  try {
+    localStorage.setItem(PROFILE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {}
 }
 
 function setLoading(loading) {
