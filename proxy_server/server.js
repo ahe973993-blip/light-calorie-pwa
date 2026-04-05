@@ -42,6 +42,24 @@ const SMTP_SECURE = parseBool(process.env.SMTP_SECURE, SMTP_PORT === 465);
 const SMTP_USER = String(process.env.SMTP_USER || "").trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || "").trim();
+const SMTP_CONNECTION_TIMEOUT_MS = clampInt(
+  Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 12000),
+  1000,
+  120000,
+  12000
+);
+const SMTP_GREETING_TIMEOUT_MS = clampInt(
+  Number(process.env.SMTP_GREETING_TIMEOUT_MS || 12000),
+  1000,
+  120000,
+  12000
+);
+const SMTP_SOCKET_TIMEOUT_MS = clampInt(
+  Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 20000),
+  1000,
+  180000,
+  20000
+);
 
 if (!DIFY_API_KEY) {
   console.warn("[WARN] DIFY_API_KEY is empty. Proxy calls will fail until you set it in .env");
@@ -107,6 +125,11 @@ app.get("/api/health", (req, res) => {
     email_code_ttl_sec: EMAIL_CODE_TTL_SEC,
     email_cooldown_sec: EMAIL_COOLDOWN_SEC,
     email_daily_limit: EMAIL_DAILY_LIMIT,
+    smtp_timeout_ms: {
+      connection: SMTP_CONNECTION_TIMEOUT_MS,
+      greeting: SMTP_GREETING_TIMEOUT_MS,
+      socket: SMTP_SOCKET_TIMEOUT_MS,
+    },
   });
 });
 
@@ -632,6 +655,9 @@ function getSmtpTransporter() {
     host: SMTP_HOST,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS,
@@ -643,13 +669,17 @@ function getSmtpTransporter() {
 
 async function sendEmailBySmtp({ email, code }) {
   const transporter = getSmtpTransporter();
-  await transporter.sendMail({
-    from: SMTP_FROM,
-    to: email,
-    subject: EMAIL_SUBJECT,
-    text: `你的验证码是 ${code}，有效期 ${Math.ceil(EMAIL_CODE_TTL_SEC / 60)} 分钟。请勿泄露给他人。`,
-    html: buildVerificationEmailHtml(code),
-  });
+  try {
+    await transporter.sendMail({
+      from: SMTP_FROM,
+      to: email,
+      subject: EMAIL_SUBJECT,
+      text: `你的验证码是 ${code}，有效期 ${Math.ceil(EMAIL_CODE_TTL_SEC / 60)} 分钟。请勿泄露给他人。`,
+      html: buildVerificationEmailHtml(code),
+    });
+  } catch (error) {
+    throw new Error(formatSmtpError(error));
+  }
 }
 
 function buildVerificationEmailHtml(code) {
@@ -722,6 +752,34 @@ function extractError(data) {
 
 function errorMessage(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function formatSmtpError(error) {
+  const message = errorMessage(error);
+  const low = String(message || "").toLowerCase();
+
+  if (
+    low.includes("timeout") ||
+    low.includes("timed out") ||
+    low.includes("etimedout") ||
+    low.includes("esocket") ||
+    low.includes("econnreset") ||
+    low.includes("ehostunreach") ||
+    low.includes("econnrefused")
+  ) {
+    return "邮箱服务连接超时，请稍后重试或更换 SMTP 服务商";
+  }
+
+  if (
+    low.includes("invalid login") ||
+    low.includes("auth") ||
+    low.includes("eauth") ||
+    low.includes("535")
+  ) {
+    return "邮箱账号或授权码无效，请检查 SMTP_USER / SMTP_PASS";
+  }
+
+  return `邮件发送失败: ${message}`;
 }
 
 async function safeJson(response) {
