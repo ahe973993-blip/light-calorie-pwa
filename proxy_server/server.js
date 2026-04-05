@@ -4,6 +4,7 @@ const fs = require("fs");
 const fsp = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
+const dns = require("dns");
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -11,6 +12,17 @@ const morgan = require("morgan");
 const multer = require("multer");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+
+const DNS_RESULT_ORDER = String(process.env.DNS_RESULT_ORDER || "ipv4first").trim().toLowerCase();
+try {
+  if (DNS_RESULT_ORDER === "ipv4first" || DNS_RESULT_ORDER === "verbatim") {
+    dns.setDefaultResultOrder(DNS_RESULT_ORDER);
+  }
+} catch (error) {
+  console.warn(
+    `[WARN] failed to set DNS result order: ${error instanceof Error ? error.message : String(error)}`
+  );
+}
 
 if (typeof fetch !== "function" || typeof FormData !== "function" || typeof Blob !== "function") {
   throw new Error("Node.js >= 18 is required (fetch/FormData/Blob missing)");
@@ -125,6 +137,7 @@ app.get("/api/health", (req, res) => {
     email_code_ttl_sec: EMAIL_CODE_TTL_SEC,
     email_cooldown_sec: EMAIL_COOLDOWN_SEC,
     email_daily_limit: EMAIL_DAILY_LIMIT,
+    dns_result_order: DNS_RESULT_ORDER || "system-default",
     smtp_timeout_ms: {
       connection: SMTP_CONNECTION_TIMEOUT_MS,
       greeting: SMTP_GREETING_TIMEOUT_MS,
