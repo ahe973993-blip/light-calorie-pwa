@@ -55,6 +55,7 @@ const SMTP_USER = String(process.env.SMTP_USER || "").trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || "").trim();
 const SMTP_FORCE_IPV4 = parseBool(process.env.SMTP_FORCE_IPV4, true);
+const SMTP_IPV4_OVERRIDE = String(process.env.SMTP_IPV4_OVERRIDE || "").trim();
 const SMTP_TLS_SERVERNAME = String(process.env.SMTP_TLS_SERVERNAME || SMTP_HOST || "").trim();
 const SMTP_CONNECTION_TIMEOUT_MS = clampInt(
   Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 12000),
@@ -141,6 +142,7 @@ app.get("/api/health", (req, res) => {
     email_daily_limit: EMAIL_DAILY_LIMIT,
     dns_result_order: DNS_RESULT_ORDER || "system-default",
     smtp_force_ipv4: SMTP_FORCE_IPV4,
+    smtp_ipv4_override: SMTP_IPV4_OVERRIDE || null,
     smtp_tls_servername: SMTP_TLS_SERVERNAME || null,
     smtp_timeout_ms: {
       connection: SMTP_CONNECTION_TIMEOUT_MS,
@@ -661,21 +663,20 @@ async function sendEmailByResend({ email, code }) {
   }
 }
 
-function getSmtpTransporter() {
-  const signature = [SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER].join("|");
+function buildSmtpTransporter(transportHost) {
+  const signature = [transportHost, SMTP_PORT, SMTP_SECURE, SMTP_USER].join("|");
   if (smtpTransporter && smtpTransportSignature === signature) {
     return smtpTransporter;
   }
 
   smtpTransportSignature = signature;
   smtpTransporter = nodemailer.createTransport({
-    host: SMTP_HOST,
+    host: transportHost,
     port: SMTP_PORT,
     secure: SMTP_SECURE,
     connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
     greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
     socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
-    ...(SMTP_FORCE_IPV4 ? { family: 4 } : {}),
     ...(SMTP_TLS_SERVERNAME ? { tls: { servername: SMTP_TLS_SERVERNAME } } : {}),
     auth: {
       user: SMTP_USER,
@@ -687,7 +688,8 @@ function getSmtpTransporter() {
 }
 
 async function sendEmailBySmtp({ email, code }) {
-  const transporter = getSmtpTransporter();
+  const transportHost = await resolveSmtpTransportHost();
+  const transporter = buildSmtpTransporter(transportHost);
   try {
     await transporter.sendMail({
       from: SMTP_FROM,
@@ -698,6 +700,30 @@ async function sendEmailBySmtp({ email, code }) {
     });
   } catch (error) {
     throw new Error(formatSmtpError(error));
+  }
+}
+
+async function resolveSmtpTransportHost() {
+  if (!SMTP_FORCE_IPV4) {
+    return SMTP_HOST;
+  }
+
+  if (isIPv4(SMTP_HOST)) {
+    return SMTP_HOST;
+  }
+
+  if (isIPv4(SMTP_IPV4_OVERRIDE)) {
+    return SMTP_IPV4_OVERRIDE;
+  }
+
+  try {
+    const addresses = await dns.promises.resolve4(SMTP_HOST);
+    if (Array.isArray(addresses) && addresses.length) {
+      return addresses[0];
+    }
+    throw new Error("no A record");
+  } catch (error) {
+    throw new Error(`SMTP IPv4 解析失败: ${errorMessage(error)}`);
   }
 }
 
@@ -741,6 +767,10 @@ function parseBool(value, fallback = false) {
   if (["1", "true", "yes", "on"].includes(text)) return true;
   if (["0", "false", "no", "off"].includes(text)) return false;
   return fallback;
+}
+
+function isIPv4(value) {
+  return /^(?:\d{1,3}\.){3}\d{1,3}$/.test(String(value || "").trim());
 }
 
 function isConfiguredSecret(value) {
