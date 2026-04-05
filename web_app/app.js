@@ -46,6 +46,7 @@ let currentUser = null;
 let timelineRecords = [];
 let sendCodeCooldown = 0;
 let sendCodeTimer = null;
+let healthProbeRetryTimer = null;
 
 removeLegacySettingsPanel();
 registerServiceWorker();
@@ -217,11 +218,27 @@ function bindAuthEvents() {
 
 async function probeBackendHealth() {
   try {
-    await apiJson("/api/health", { method: "GET" });
+    await apiJson("/api/health", { method: "GET", timeoutMs: 120000 });
+    clearHealthProbeRetry();
     setAuthTip(`后端连接正常（${activeApiBase}），请先发送邮箱验证码再登录。`);
   } catch {
-    setAuthTip("后端暂不可用，请稍后重试。", true);
+    setAuthTip("正在连接后端（Render 免费版首次可能需要 1-2 分钟）...", false);
+    scheduleHealthProbeRetry();
   }
+}
+
+function scheduleHealthProbeRetry() {
+  if (healthProbeRetryTimer) return;
+  healthProbeRetryTimer = setTimeout(() => {
+    healthProbeRetryTimer = null;
+    probeBackendHealth();
+  }, 15000);
+}
+
+function clearHealthProbeRetry() {
+  if (!healthProbeRetryTimer) return;
+  clearTimeout(healthProbeRetryTimer);
+  healthProbeRetryTimer = null;
 }
 
 async function restoreSessionAndSync() {
@@ -517,7 +534,7 @@ async function runWorkflowViaProxy({ values, files, token }) {
   return data;
 }
 
-async function apiJson(pathname, { method = "GET", body = null, auth = false } = {}) {
+async function apiJson(pathname, { method = "GET", body = null, auth = false, timeoutMs = 45000 } = {}) {
   const headers = {};
 
   if (body && !(body instanceof FormData)) {
@@ -534,7 +551,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
     method,
     headers,
     body,
-  }, 45000);
+  }, timeoutMs);
 
   const data = await safeReadJson(response);
   if (!response.ok) {
