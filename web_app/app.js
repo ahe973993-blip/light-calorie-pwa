@@ -1,6 +1,4 @@
 const DEFAULT_PUBLIC_PROXY_BASES = [
-  "https://audit-committees-has-catalog.trycloudflare.com",
-  "https://a15eb743eca76b.lhr.life",
   "https://light-calorie-proxy.onrender.com",
 ];
 const API_BASE_STORAGE_KEY = "xhs_api_base_v4";

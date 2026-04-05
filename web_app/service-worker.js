@@ -1,9 +1,9 @@
-const CACHE_NAME = "light-calorie-pwa-v12";
+const CACHE_NAME = "light-calorie-pwa-v13";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=20260404d",
-  "./app.js?v=20260404d",
+  "./styles.css?v=20260405a",
+  "./app.js?v=20260405a",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

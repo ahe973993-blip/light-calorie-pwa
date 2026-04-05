@@ -72,3 +72,16 @@ npm start
 - 生产把 `CORS_ORIGIN` 限制为你的前端域名。
 - 为登录和提交接口增加限流、防刷。
 - 生产必须关闭 `EMAIL_DEBUG_RETURN_CODE`，避免把验证码回传给前端。
+
+## Render 稳定上线（推荐）
+1. 在 Render 使用仓库根目录的 `render.yaml` 创建服务。
+2. 在 Render 控制台补齐这些环境变量：
+   - `DIFY_BASE_URL`
+   - `DIFY_API_KEY`
+   - `JWT_SECRET`
+   - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`
+3. 部署完成后访问：`/api/health`。
+
+重要：
+- 如果你的 Dify Key 只在 `http://localhost/v1` 可用，它不能用于 Render。
+- Render 只能调用“公网可达”的 Dify 地址。

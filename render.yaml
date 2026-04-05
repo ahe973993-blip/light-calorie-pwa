@@ -3,6 +3,7 @@
     name: light-calorie-proxy
     env: node
     plan: free
+    healthCheckPath: /api/health
     rootDir: proxy_server
     buildCommand: npm install
     startCommand: npm start
@@ -10,11 +11,11 @@
       - key: PORT
         value: 10000
       - key: DIFY_BASE_URL
-        value: https://api.dify.ai/v1
+        sync: false
       - key: DIFY_API_KEY
         sync: false
       - key: CORS_ORIGIN
-        sync: false
+        value: https://ahe973993-blip.github.io
       - key: MAX_FILE_MB
         value: 12
       - key: JWT_SECRET
@@ -24,7 +25,7 @@
       - key: DB_PATH
         value: ./data/store.json
       - key: EMAIL_PROVIDER
-        value: mock
+        value: smtp
       - key: EMAIL_CODE_TTL_SEC
         value: 300
       - key: EMAIL_COOLDOWN_SEC

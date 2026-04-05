@@ -42,6 +42,20 @@ python -m http.server 8080
   - `EMAIL_PROVIDER`（测试 `mock`，免费生产建议 `smtp`）
   - `CORS_ORIGIN`（设为前端域名）
 
+#### Render 固定域名部署（稳定版）
+1. Render 新建 `Blueprint`，选择本仓库（会读取 `render.yaml`）。
+2. 在 Render 环境变量里填写：
+   - `DIFY_BASE_URL`：你的 Dify 公网地址（例如 `https://api.dify.ai/v1` 或你自建 Dify 域名）。
+   - `DIFY_API_KEY`：与上面 Base URL 对应的有效应用 Key。
+   - `JWT_SECRET`：一串长随机字符串。
+   - `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`SMTP_FROM`。
+3. 部署成功后，确认 `GET /api/health` 返回 `ok:true`。
+4. 前端固定访问：`https://ahe973993-blip.github.io/light-calorie-pwa/`（不再依赖临时隧道）。
+
+注意：
+- `app-ld...` 这种 Key 若只对 `http://localhost/v1` 有效，不能直接用于 Render 生产（Render 无法访问你本机 localhost）。
+- 必须使用“公网可访问 Dify”对应的 Key。
+
 ## 安全
 - 不要把真实 API Key 提交到 GitHub。
 - `proxy_server/.env` 已在 `.gitignore` 中排除。
