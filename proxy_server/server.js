@@ -54,6 +54,8 @@ const SMTP_SECURE = parseBool(process.env.SMTP_SECURE, SMTP_PORT === 465);
 const SMTP_USER = String(process.env.SMTP_USER || "").trim();
 const SMTP_PASS = String(process.env.SMTP_PASS || "").trim();
 const SMTP_FROM = String(process.env.SMTP_FROM || "").trim();
+const SMTP_FORCE_IPV4 = parseBool(process.env.SMTP_FORCE_IPV4, true);
+const SMTP_TLS_SERVERNAME = String(process.env.SMTP_TLS_SERVERNAME || SMTP_HOST || "").trim();
 const SMTP_CONNECTION_TIMEOUT_MS = clampInt(
   Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 12000),
   1000,
@@ -138,6 +140,8 @@ app.get("/api/health", (req, res) => {
     email_cooldown_sec: EMAIL_COOLDOWN_SEC,
     email_daily_limit: EMAIL_DAILY_LIMIT,
     dns_result_order: DNS_RESULT_ORDER || "system-default",
+    smtp_force_ipv4: SMTP_FORCE_IPV4,
+    smtp_tls_servername: SMTP_TLS_SERVERNAME || null,
     smtp_timeout_ms: {
       connection: SMTP_CONNECTION_TIMEOUT_MS,
       greeting: SMTP_GREETING_TIMEOUT_MS,
@@ -671,6 +675,8 @@ function getSmtpTransporter() {
     connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
     greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
     socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
+    ...(SMTP_FORCE_IPV4 ? { family: 4 } : {}),
+    ...(SMTP_TLS_SERVERNAME ? { tls: { servername: SMTP_TLS_SERVERNAME } } : {}),
     auth: {
       user: SMTP_USER,
       pass: SMTP_PASS,
