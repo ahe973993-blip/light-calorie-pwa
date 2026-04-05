@@ -534,7 +534,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
     method,
     headers,
     body,
-  }, 8000);
+  }, 45000);
 
   const data = await safeReadJson(response);
   if (!response.ok) {
@@ -544,7 +544,7 @@ async function apiJson(pathname, { method = "GET", body = null, auth = false } =
   return data;
 }
 
-async function requestApi(pathname, init, timeoutMs = 10000) {
+async function requestApi(pathname, init, timeoutMs = 45000) {
   const tried = [];
   let lastNetworkError = null;
   const candidates = [activeApiBase, ...API_BASE_CANDIDATES.filter((base) => base !== activeApiBase)];
@@ -587,10 +587,10 @@ async function requestApi(pathname, init, timeoutMs = 10000) {
   }
 
   if (lastNetworkError) {
-    throw new Error(`无法连接后端服务（已尝试：${tried.join(" , ")}）`);
+    throw new Error(`无法连接后端服务（已尝试：${tried.join(" , ")}）。若使用 Render 免费版，可能在冷启动，请稍后再试。`);
   }
 
-  throw new Error(`后端服务不可用（已尝试：${tried.join(" , ")}）`);
+  throw new Error(`后端服务不可用（已尝试：${tried.join(" , ")}）。若使用 Render 免费版，可能在冷启动，请稍后再试。`);
 }
 
 function extractReport(runData) {
