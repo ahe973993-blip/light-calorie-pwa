@@ -1,0 +1,249 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ff2442" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>轻卡小记 | AI 营养师</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="./styles.css?v=20260406a" />
+  </head>
+  <body>
+    <div class="bg-blur bg-blur-a"></div>
+    <div class="bg-blur bg-blur-b"></div>
+    <main class="page">
+      <section id="login-page" class="login-page">
+        <header class="hero reveal">
+          <h1>轻卡小记</h1>
+          <p>先登录账号，再开始记录你的每日饮食。</p>
+        </header>
+
+        <section class="card auth-card reveal" id="auth-card">
+          <div class="card-title-row">
+            <h2>账号同步</h2>
+            <span id="auth-status-chip" class="chip">未登录</span>
+          </div>
+          <p id="auth-tip" class="timeline-hint">登录后可跨设备同步你的饮食记录。</p>
+
+          <div id="auth-logged-out" class="auth-grid">
+            <form id="account-auth-form" class="auth-form">
+              <h3>账号密码登录</h3>
+              <label>
+                账号
+                <input
+                  name="account"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="username"
+                  placeholder="请输入账号（4-40位）"
+                  required
+                />
+              </label>
+              <label>
+                密码
+                <input
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="请输入密码（至少6位）"
+                  required
+                />
+              </label>
+              <label>
+                昵称（仅注册时可填）
+                <input name="nickname" type="text" inputmode="text" placeholder="例如：小何" maxlength="20" />
+              </label>
+              <div class="auth-actions">
+                <button class="submit-btn" type="submit">账号登录</button>
+                <button id="register-btn" type="button" class="ghost-btn">注册并登录</button>
+              </div>
+            </form>
+            <p class="timeline-hint">首次使用先注册，后续直接登录即可。</p>
+          </div>
+        </section>
+      </section>
+
+      <section id="app-page" class="app-page" hidden>
+        <header class="hero reveal">
+          <h1>轻卡小记</h1>
+          <p>上传三餐图片，填写克重和体征信息，一键拿到今日热量报告。</p>
+        </header>
+
+        <section class="card app-account-bar reveal">
+          <div>
+            当前账号：<strong id="app-user-name">-</strong>
+          </div>
+          <button id="app-logout-btn" type="button" class="ghost-btn">退出登录</button>
+        </section>
+
+        <section class="grid">
+        <form id="nutrition-form" class="card form-card reveal" novalidate>
+          <div class="card-title-row">
+            <h2>今日记录</h2>
+            <span class="chip hot">减脂模式</span>
+          </div>
+
+          <div class="form-section">
+            <h3>基础信息</h3>
+            <div class="field-grid two-col">
+              <label>
+                身高 (cm)
+                <input name="height_cm" type="number" min="120" max="230" required />
+              </label>
+              <label>
+                体重 (kg)
+                <input name="weight_kg" type="number" min="25" max="300" required />
+              </label>
+              <label>
+                年龄
+                <input name="age" type="number" min="10" max="100" required />
+              </label>
+              <label>
+                性别
+                <select name="gender" required>
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                </select>
+              </label>
+              <label class="full">
+                活动水平
+                <select name="activity_level" required>
+                  <option value="久坐">久坐</option>
+                  <option value="轻量活动">轻量活动</option>
+                  <option value="中等活动">中等活动</option>
+                  <option value="高强度活动">高强度活动</option>
+                  <option value="极高活动">极高活动</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>三餐图片</h3>
+            <div class="meal-grid">
+              <label class="meal-upload" data-preview-target="preview-breakfast">
+                <span>早餐图片</span>
+                <input name="breakfast_image" type="file" accept="image/*" required />
+                <img id="preview-breakfast" alt="早餐预览" />
+              </label>
+              <label class="meal-upload" data-preview-target="preview-lunch">
+                <span>午餐图片</span>
+                <input name="lunch_image" type="file" accept="image/*" required />
+                <img id="preview-lunch" alt="午餐预览" />
+              </label>
+              <label class="meal-upload" data-preview-target="preview-dinner">
+                <span>晚餐图片</span>
+                <input name="dinner_image" type="file" accept="image/*" required />
+                <img id="preview-dinner" alt="晚餐预览" />
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h3>食物克重</h3>
+            <div class="field-grid">
+              <label>
+                早餐食物及克重
+                <textarea
+                  name="breakfast_items"
+                  rows="3"
+                  required
+                  placeholder="例如：鸡蛋100g，牛奶250g，面包60g"
+                ></textarea>
+              </label>
+              <label>
+                午餐食物及克重
+                <textarea
+                  name="lunch_items"
+                  rows="3"
+                  required
+                  placeholder="例如：米饭200g，鸡胸肉150g，西兰花120g"
+                ></textarea>
+              </label>
+              <label>
+                晚餐食物及克重
+                <textarea
+                  name="dinner_items"
+                  rows="3"
+                  required
+                  placeholder="例如：米饭120g，鱼肉180g，菠菜150g"
+                ></textarea>
+              </label>
+            </div>
+          </div>
+
+          <p class="timeline-hint">已连接后端服务，提交后将自动生成报告。</p>
+
+          <button class="submit-btn" id="submit-btn" type="submit">
+            生成今日热量报告
+          </button>
+          <p id="status-text" class="status-text" aria-live="polite"></p>
+        </form>
+
+        <aside class="card result-card reveal">
+          <div class="card-title-row">
+            <h2>报告结果</h2>
+            <span id="result-tag" class="chip">等待生成</span>
+          </div>
+          <pre id="result-report" class="report">还没有结果，先填写左侧表单并提交。</pre>
+          <details>
+            <summary>查看原始响应</summary>
+            <pre id="result-raw" class="raw-json">{}</pre>
+          </details>
+        </aside>
+      </section>
+
+        <section class="card timeline-card reveal">
+        <div class="card-title-row">
+          <h2>饮食时间线</h2>
+          <span id="timeline-count" class="chip">0 天记录</span>
+        </div>
+        <p class="timeline-hint">
+          每次生成报告后，自动记录当天早餐/午餐/晚餐照片与总热量。
+        </p>
+        <div id="timeline-list" class="timeline-list">
+          <div class="timeline-empty">还没有时间线记录，先生成一次今日报告。</div>
+        </div>
+      </section>
+
+        <section class="stats-grid reveal">
+        <article class="card stat-card">
+          <div class="card-title-row">
+            <h2>连续打卡</h2>
+            <span class="chip hot">坚持记录</span>
+          </div>
+          <div class="streak-wrap">
+            <div class="streak-days"><span id="streak-days">0</span> 天</div>
+            <div id="streak-hint" class="streak-hint">还没有打卡记录</div>
+          </div>
+        </article>
+
+        <article class="card stat-card">
+          <div class="card-title-row">
+            <h2>周统计图</h2>
+            <span id="weekly-summary" class="chip">本周暂无数据</span>
+          </div>
+          <div id="weekly-chart" class="chart-bars">
+            <div class="chart-empty">生成记录后显示近 7 天热量柱状图</div>
+          </div>
+        </article>
+
+        <article class="card stat-card">
+          <div class="card-title-row">
+            <h2>体重趋势图</h2>
+            <span id="weight-summary" class="chip">暂无数据</span>
+          </div>
+          <div id="weight-chart" class="line-chart-wrap">
+            <div class="chart-empty">至少需要 2 天记录，才可显示趋势线</div>
+          </div>
+        </article>
+      </section>
+      </section>
+    </main>
+
+    <script src="./app.js?v=20260406a" type="module"></script>
+  </body>
+</html>
