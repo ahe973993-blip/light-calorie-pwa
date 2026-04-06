@@ -9,7 +9,7 @@
     <title>轻卡小记 | AI 营养师</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <link rel="stylesheet" href="./styles.css?v=20260405c" />
+    <link rel="stylesheet" href="./styles.css?v=20260406a" />
   </head>
   <body>
     <div class="bg-blur bg-blur-a"></div>
@@ -29,21 +29,39 @@
           <p id="auth-tip" class="timeline-hint">登录后可跨设备同步你的饮食记录。</p>
 
           <div id="auth-logged-out" class="auth-grid">
-            <form id="email-login-form" class="auth-form">
-              <h3>邮箱验证码登录</h3>
+            <form id="account-auth-form" class="auth-form">
+              <h3>账号密码登录</h3>
               <label>
-                邮箱
-                <input name="email" type="email" inputmode="email" placeholder="请输入邮箱地址" required />
+                账号
+                <input
+                  name="account"
+                  type="text"
+                  inputmode="text"
+                  autocomplete="username"
+                  placeholder="请输入账号（4-40位）"
+                  required
+                />
               </label>
-              <div class="code-row">
-                <label>
-                  验证码
-                  <input name="code" type="text" inputmode="numeric" placeholder="6位验证码" required />
-                </label>
-                <button id="send-code-btn" type="button" class="ghost-btn">发送验证码</button>
+              <label>
+                密码
+                <input
+                  name="password"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="请输入密码（至少6位）"
+                  required
+                />
+              </label>
+              <label>
+                昵称（仅注册时可填）
+                <input name="nickname" type="text" inputmode="text" placeholder="例如：小何" maxlength="20" />
+              </label>
+              <div class="auth-actions">
+                <button class="submit-btn" type="submit">账号登录</button>
+                <button id="register-btn" type="button" class="ghost-btn">注册并登录</button>
               </div>
-              <button class="submit-btn" type="submit">邮箱登录</button>
             </form>
+            <p class="timeline-hint">首次使用先注册，后续直接登录即可。</p>
           </div>
         </section>
       </section>
@@ -226,6 +244,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=20260405c" type="module"></script>
+    <script src="./app.js?v=20260406a" type="module"></script>
   </body>
 </html>

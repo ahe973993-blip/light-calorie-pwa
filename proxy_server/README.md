@@ -1,9 +1,9 @@
-﻿# 后端代理版（账号 + 云端同步）
+# 后端代理版（账号密码 + 云端同步）
 
 ## 作用
 - 前端只请求代理，不暴露 Dify API Key
 - 后端统一负责：
-  - 邮箱验证码登录
+  - 账号密码注册/登录
   - 运行 Dify 工作流
   - 按用户保存饮食记录（云端同步）
 
@@ -19,28 +19,14 @@ cp .env.example .env
 
 关键变量：
 - `DIFY_BASE_URL=https://api.dify.ai/v1`
-- `DIFY_API_KEY=你的Dify应用API_KEY`
+- `DIFY_API_KEY=你的 Dify 应用 API Key`
 - `JWT_SECRET=长随机字符串`
-- `EMAIL_PROVIDER=mock|smtp|resend`
 - `DB_PATH=./data/store.json`
 
-免费测试模式：
-- `EMAIL_PROVIDER=mock`
-- 可配 `EMAIL_DEBUG_RETURN_CODE=true`，前端会返回测试验证码（仅测试环境）
-
-免费生产模式（SMTP，推荐 QQ/163）：
-- `EMAIL_PROVIDER=smtp`
-- `SMTP_HOST=smtp.qq.com`（或 `smtp.163.com`）
-- `SMTP_PORT=465`
-- `SMTP_SECURE=true`
-- `SMTP_USER=你的邮箱`
-- `SMTP_PASS=SMTP授权码（不是邮箱登录密码）`
-- `SMTP_FROM=你的邮箱`
-
-生产邮件（Resend）：
-- `EMAIL_PROVIDER=resend`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`（例如 `noreply@你的域名`）
+可选密码策略：
+- `PASSWORD_MIN_LEN=6`
+- `PASSWORD_MAX_LEN=72`
+- `PASSWORD_PBKDF2_ITERATIONS=120000`
 
 ## 2) 安装依赖并启动
 ```bash
@@ -55,8 +41,8 @@ npm start
 
 ## 3) 主要 API
 ### 鉴权
-- `POST /api/auth/email/send` 发送邮箱验证码
-- `POST /api/auth/email/login` 邮箱验证码登录
+- `POST /api/auth/register` 账号注册并返回 token
+- `POST /api/auth/login` 账号密码登录
 - `GET /api/auth/me` 获取当前用户
 
 ### 记录
@@ -64,24 +50,12 @@ npm start
 - `GET /api/records` 获取当前用户记录（需 Bearer Token）
 
 ## 数据存储
-- 默认使用 JSON 文件：`DB_PATH` 指定的路径。
-- 要“真正云端永久保存”，请部署到有持久磁盘的服务，或改接 MySQL/PostgreSQL。
+- 默认使用 JSON 文件：`DB_PATH` 指定路径。
+- 想要真正长期保存，建议：
+  - Render 挂载持久磁盘，并把 `DB_PATH` 设为 `/var/data/store.json`
+  - 或改接 MySQL/PostgreSQL。
 
 ## 安全建议
-- `DIFY_API_KEY`、`JWT_SECRET` 必须只放后端。
-- 生产把 `CORS_ORIGIN` 限制为你的前端域名。
-- 为登录和提交接口增加限流、防刷。
-- 生产必须关闭 `EMAIL_DEBUG_RETURN_CODE`，避免把验证码回传给前端。
-
-## Render 稳定上线（推荐）
-1. 在 Render 使用仓库根目录的 `render.yaml` 创建服务。
-2. 在 Render 控制台补齐这些环境变量：
-   - `DIFY_BASE_URL`
-   - `DIFY_API_KEY`
-   - `JWT_SECRET`
-   - `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM`
-3. 部署完成后访问：`/api/health`。
-
-重要：
-- 如果你的 Dify Key 只在 `http://localhost/v1` 可用，它不能用于 Render。
-- Render 只能调用“公网可达”的 Dify 地址。
+- `DIFY_API_KEY`、`JWT_SECRET` 仅存后端，不要提交到仓库。
+- 生产环境请把 `CORS_ORIGIN` 限制为你的前端域名。
+- 可对登录与提交接口加限流，防止暴力尝试。

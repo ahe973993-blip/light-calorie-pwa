@@ -24,31 +24,9 @@
         value: 30d
       - key: DB_PATH
         value: ./data/store.json
-      - key: EMAIL_PROVIDER
-        value: smtp
-      - key: EMAIL_CODE_TTL_SEC
-        value: 300
-      - key: EMAIL_COOLDOWN_SEC
-        value: 60
-      - key: EMAIL_DAILY_LIMIT
-        value: 20
-      - key: EMAIL_DEBUG_RETURN_CODE
-        value: false
-      - key: EMAIL_SUBJECT
-        value: 轻卡小记登录验证码
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        value: 465
-      - key: SMTP_SECURE
-        value: true
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: RESEND_FROM_EMAIL
-        sync: false
+      - key: PASSWORD_MIN_LEN
+        value: 6
+      - key: PASSWORD_MAX_LEN
+        value: 72
+      - key: PASSWORD_PBKDF2_ITERATIONS
+        value: 120000

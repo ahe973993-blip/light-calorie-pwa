@@ -3,13 +3,13 @@
 一个可上线的饮食记录系统，包含：
 - Dify 工作流 DSL（饮食识别 + 热量计算 + TDEE 对比）
 - 小红书风格网页前端
-- 后端代理（隐藏 API Key + 账号体系 + 云端同步）
+- 后端代理（隐藏 API Key + 账号密码 + 云端同步）
 - iOS SwiftUI 工程骨架
 
 ## 目录结构
 - `dify_workflow/`：Dify DSL 与代码节点
-- `web_app/`：前端网页（支持邮箱验证码登录、时间线、周统计图、体重趋势、连续打卡、PWA）
-- `proxy_server/`：后端代理（Node.js + Express，支持邮箱验证码登录）
+- `web_app/`：前端网页（支持账号密码登录、时间线、周统计图、体重趋势、连续打卡、PWA）
+- `proxy_server/`：后端代理（Node.js + Express，支持账号密码登录）
 - `ios_app/`：iOS 应用工程
 
 ## 本地运行
@@ -39,7 +39,7 @@ python -m http.server 8080
   - `DIFY_BASE_URL`
   - `DIFY_API_KEY`
   - `JWT_SECRET`
-  - `EMAIL_PROVIDER`（测试 `mock`，免费生产建议 `smtp`）
+  - `DB_PATH`（建议持久磁盘路径，如 `/var/data/store.json`）
   - `CORS_ORIGIN`（设为前端域名）
 
 #### Render 固定域名部署（稳定版）
@@ -48,7 +48,7 @@ python -m http.server 8080
    - `DIFY_BASE_URL`：你的 Dify 公网地址（例如 `https://api.dify.ai/v1` 或你自建 Dify 域名）。
    - `DIFY_API_KEY`：与上面 Base URL 对应的有效应用 Key。
    - `JWT_SECRET`：一串长随机字符串。
-   - `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURE`、`SMTP_USER`、`SMTP_PASS`、`SMTP_FROM`。
+   - `DB_PATH`：建议 `/var/data/store.json`（并挂载持久盘）。
 3. 部署成功后，确认 `GET /api/health` 返回 `ok:true`。
 4. 前端固定访问：`https://ahe973993-blip.github.io/light-calorie-pwa/`（不再依赖临时隧道）。
 

@@ -34,18 +34,16 @@ const loginPageEl = document.getElementById("login-page");
 const appPageEl = document.getElementById("app-page");
 const appUserNameEl = document.getElementById("app-user-name");
 
-const emailLoginForm = document.getElementById("email-login-form");
-const sendCodeBtn = document.getElementById("send-code-btn");
+const accountAuthForm = document.getElementById("account-auth-form");
+const registerBtn = document.getElementById("register-btn");
 const appLogoutBtn = document.getElementById("app-logout-btn");
 
 const fileInputs = ["breakfast_image", "lunch_image", "dinner_image"];
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const ACCOUNT_REGEX = /^[a-z0-9][a-z0-9_.@-]{3,39}$/;
 
 let authToken = "";
 let currentUser = null;
 let timelineRecords = [];
-let sendCodeCooldown = 0;
-let sendCodeTimer = null;
 let healthProbeRetryTimer = null;
 
 removeLegacySettingsPanel();
@@ -127,26 +125,26 @@ form.addEventListener("submit", async (event) => {
 });
 
 function bindAuthEvents() {
-  emailLoginForm?.addEventListener("submit", async (event) => {
+  accountAuthForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const fd = new FormData(emailLoginForm);
-    const email = String(fd.get("email") || "").trim().toLowerCase();
-    const code = String(fd.get("code") || "").trim();
+    const fd = new FormData(accountAuthForm);
+    const account = normalizeAccount(fd.get("account"));
+    const password = String(fd.get("password") || "");
 
-    if (!EMAIL_REGEX.test(email)) {
-      setAuthTip("请输入正确的邮箱地址", true);
+    if (!ACCOUNT_REGEX.test(account)) {
+      setAuthTip("请输入正确账号（4-40位，字母/数字/._-@）", true);
       return;
     }
-    if (!/^\d{6}$/.test(code)) {
-      setAuthTip("请输入 6 位验证码", true);
+    if (password.length < 6) {
+      setAuthTip("密码至少 6 位", true);
       return;
     }
 
     try {
       setAuthTip("登录中...");
-      const data = await apiJson("/api/auth/email/login", {
+      const data = await apiJson("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({ account, password }),
       });
 
       setSession(data.token, data.user);
@@ -160,47 +158,47 @@ function bindAuthEvents() {
     }
   });
 
-  sendCodeBtn?.addEventListener("click", async () => {
-    if (sendCodeCooldown > 0) {
+  registerBtn?.addEventListener("click", async () => {
+    if (!accountAuthForm) {
       return;
     }
-    if (!emailLoginForm) {
-      setAuthTip("登录表单加载失败，请刷新页面重试", true);
+    const fd = new FormData(accountAuthForm);
+    const account = normalizeAccount(fd.get("account"));
+    const password = String(fd.get("password") || "");
+    const nickname = String(fd.get("nickname") || "").trim();
+
+    if (!ACCOUNT_REGEX.test(account)) {
+      setAuthTip("请输入正确账号（4-40位，字母/数字/._-@）", true);
       return;
     }
-
-    const fd = new FormData(emailLoginForm);
-    const email = String(fd.get("email") || "").trim().toLowerCase();
-
-    if (!EMAIL_REGEX.test(email)) {
-      setAuthTip("请输入正确的邮箱地址", true);
+    if (password.length < 6) {
+      setAuthTip("密码至少 6 位", true);
       return;
     }
 
     try {
-      if (sendCodeBtn) {
-        sendCodeBtn.disabled = true;
-        sendCodeBtn.textContent = "发送中...";
+      if (registerBtn) {
+        registerBtn.disabled = true;
+        registerBtn.textContent = "注册中...";
       }
-      setAuthTip("正在发送验证码...");
-      const data = await apiJson("/api/auth/email/send", {
+      setAuthTip("注册中...");
+      const data = await apiJson("/api/auth/register", {
         method: "POST",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ account, password, nickname }),
       });
 
-      if (data?.dev_code) {
-        setAuthTip(`测试验证码：${data.dev_code}（正式环境不会展示）`);
-      } else {
-        setAuthTip("验证码已发送，请查收邮箱。");
-      }
-
-      startSendCodeCooldown(60);
+      setSession(data.token, data.user);
+      applyAuthState();
+      await fetchCloudRecords(false);
+      setAuthTip("注册成功，已自动登录。");
+      setStatus("已注册并登录，可开始记录。", false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       setAuthTip(errorMessage(error), true);
-      renderSendCodeBtn();
     } finally {
-      if (sendCodeCooldown <= 0) {
-        renderSendCodeBtn();
+      if (registerBtn) {
+        registerBtn.disabled = false;
+        registerBtn.textContent = "注册并登录";
       }
     }
   });
@@ -220,7 +218,7 @@ async function probeBackendHealth() {
   try {
     await apiJson("/api/health", { method: "GET", timeoutMs: 120000 });
     clearHealthProbeRetry();
-    setAuthTip(`后端连接正常（${activeApiBase}），请先发送邮箱验证码再登录。`);
+    setAuthTip(`后端连接正常（${activeApiBase}），请输入账号密码登录。`);
   } catch {
     setAuthTip("正在连接后端（Render 免费版首次可能需要 1-2 分钟）...", false);
     scheduleHealthProbeRetry();
@@ -393,7 +391,9 @@ function applyAuthState() {
   }
 
   if (appUserNameEl) {
-    appUserNameEl.textContent = loggedIn ? `${currentUser.nickname || currentUser.email || "用户"}` : "-";
+    appUserNameEl.textContent = loggedIn
+      ? `${currentUser.nickname || currentUser.account || currentUser.email || "用户"}`
+      : "-";
   }
 
   setSubmitEnabled(loggedIn);
@@ -411,35 +411,8 @@ function setAuthTip(text, isError = false) {
   authTipEl.style.color = isError ? "#cf1634" : "#6f7280";
 }
 
-function startSendCodeCooldown(seconds) {
-  sendCodeCooldown = seconds;
-  renderSendCodeBtn();
-
-  if (sendCodeTimer) {
-    clearInterval(sendCodeTimer);
-    sendCodeTimer = null;
-  }
-
-  sendCodeTimer = setInterval(() => {
-    sendCodeCooldown -= 1;
-    if (sendCodeCooldown <= 0) {
-      clearInterval(sendCodeTimer);
-      sendCodeTimer = null;
-      sendCodeCooldown = 0;
-    }
-    renderSendCodeBtn();
-  }, 1000);
-}
-
-function renderSendCodeBtn() {
-  if (!sendCodeBtn) return;
-  if (sendCodeCooldown > 0) {
-    sendCodeBtn.disabled = true;
-    sendCodeBtn.textContent = `${sendCodeCooldown}s`;
-  } else {
-    sendCodeBtn.disabled = false;
-    sendCodeBtn.textContent = "发送验证码";
-  }
+function normalizeAccount(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 function collectValues() {

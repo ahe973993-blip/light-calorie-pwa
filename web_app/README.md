@@ -1,7 +1,7 @@
 ﻿# 网页版 AI 营养师（小红书风格）
 
 ## 功能
-- 邮箱验证码登录（云端账号）
+- 账号密码登录/注册（云端账号）
 - 上传早餐/午餐/晚餐图片并生成热量报告
 - 云端时间线同步：按天展示早中晚照片 + 今日总热量
 - 周统计图、体重趋势图、连续打卡天数
@@ -25,8 +25,8 @@ python -m http.server 8080
 
 ## 账号与同步
 - 前端会调用后端账号接口：
-  - `POST /api/auth/email/send`
-  - `POST /api/auth/email/login`
+  - `POST /api/auth/register`
+  - `POST /api/auth/login`
   - `GET /api/auth/me`
   - `GET /api/records`
 - 登录后数据按账号隔离，支持多设备同步。

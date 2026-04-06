@@ -216,6 +216,19 @@ body {
   align-items: end;
 }
 
+.auth-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-actions .submit-btn {
+  margin-top: 0;
+}
+
+.auth-actions .ghost-btn {
+  width: 100%;
+}
+
 .ghost-btn {
   border: 1px solid #d8dceb;
   border-radius: 12px;

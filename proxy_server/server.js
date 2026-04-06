@@ -38,6 +38,14 @@ const MAX_FILE_MB = Number(process.env.MAX_FILE_MB || 12);
 const JWT_SECRET = String(process.env.JWT_SECRET || "").trim() || "change-this-jwt-secret";
 const TOKEN_EXPIRES_IN = String(process.env.TOKEN_EXPIRES_IN || "30d").trim();
 const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, "data", "store.json"));
+const PASSWORD_MIN_LEN = clampInt(Number(process.env.PASSWORD_MIN_LEN || 6), 6, 32, 6);
+const PASSWORD_MAX_LEN = clampInt(Number(process.env.PASSWORD_MAX_LEN || 72), PASSWORD_MIN_LEN, 128, 72);
+const PASSWORD_PBKDF2_ITERATIONS = clampInt(
+  Number(process.env.PASSWORD_PBKDF2_ITERATIONS || 120000),
+  10000,
+  600000,
+  120000
+);
 
 const EMAIL_PROVIDER = String(process.env.EMAIL_PROVIDER || "mock").trim().toLowerCase();
 const EMAIL_CODE_TTL_SEC = clampInt(Number(process.env.EMAIL_CODE_TTL_SEC || 300), 60, 1800, 300);
@@ -129,10 +137,13 @@ app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     service: "dify-nutrition-proxy",
+    auth_mode: "account_password",
     dify_base_url: DIFY_BASE_URL,
     has_api_key: Boolean(DIFY_API_KEY),
     max_file_mb: MAX_FILE_MB,
     has_jwt_secret: Boolean(JWT_SECRET),
+    password_min_len: PASSWORD_MIN_LEN,
+    password_max_len: PASSWORD_MAX_LEN,
     users: db.users.length,
     records: db.meal_records.length,
     email_provider: EMAIL_PROVIDER,
@@ -150,6 +161,93 @@ app.get("/api/health", (req, res) => {
       socket: SMTP_SOCKET_TIMEOUT_MS,
     },
   });
+});
+
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const account = normalizeAccount(req.body?.account);
+    const password = String(req.body?.password || "");
+    const nicknameInput = String(req.body?.nickname || "").trim();
+
+    if (!isValidAccount(account)) {
+      return res
+        .status(400)
+        .json({ message: "账号格式不正确，请使用 4-40 位字母/数字/._-@" });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
+    }
+
+    const nowIso = new Date().toISOString();
+    const passwordSalt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = hashPassword(password, passwordSalt);
+    const existing = findUserByAccount(account);
+    let user = existing || null;
+
+    if (existing?.password_hash && existing?.password_salt) {
+      return res.status(409).json({ message: "账号已存在，请直接登录" });
+    }
+
+    if (existing) {
+      existing.account = account;
+      existing.password_salt = passwordSalt;
+      existing.password_hash = passwordHash;
+      existing.nickname = sanitizeNickname(nicknameInput) || existing.nickname || buildNicknameFromAccount(account);
+      existing.updated_at = nowIso;
+      if (!existing.email && account.includes("@")) {
+        existing.email = account;
+      }
+      user = existing;
+    } else {
+      user = {
+        id: crypto.randomUUID(),
+        account,
+        email: account.includes("@") ? account : "",
+        nickname: sanitizeNickname(nicknameInput) || buildNicknameFromAccount(account),
+        password_salt: passwordSalt,
+        password_hash: passwordHash,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      db.users.push(user);
+    }
+
+    await saveDB();
+
+    const token = signToken(user);
+    return res.json({ ok: true, token, user: publicUser(user) });
+  } catch (error) {
+    return res.status(500).json({ message: errorMessage(error) });
+  }
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const account = normalizeAccount(req.body?.account);
+  const password = String(req.body?.password || "");
+
+  if (!isValidAccount(account)) {
+    return res.status(400).json({ message: "请输入正确账号" });
+  }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  const user = findUserByAccount(account);
+  if (!user || !user.password_salt || !user.password_hash) {
+    return res.status(401).json({ message: "账号或密码错误" });
+  }
+
+  const matched = verifyPassword(password, user.password_salt, user.password_hash);
+  if (!matched) {
+    return res.status(401).json({ message: "账号或密码错误" });
+  }
+
+  const token = signToken(user);
+  return res.json({ ok: true, token, user: publicUser(user) });
 });
 
 app.post("/api/auth/email/send", async (req, res) => {
@@ -238,6 +336,7 @@ app.post("/api/auth/email/login", async (req, res) => {
     const nickname = buildNicknameFromEmail(email);
     user = {
       id: crypto.randomUUID(),
+      account: email,
       email,
       nickname,
       created_at: nowIso,
@@ -459,9 +558,15 @@ function findUserByEmail(email) {
   return db.users.find((item) => normalizeEmail(item.email) === email);
 }
 
+function findUserByAccount(account) {
+  const target = normalizeAccount(account);
+  return db.users.find((item) => normalizeAccount(item.account || item.email) === target);
+}
+
 function publicUser(user) {
   return {
     id: user.id,
+    account: user.account || user.email || "",
     email: user.email || "",
     nickname: user.nickname,
     created_at: user.created_at,
@@ -595,6 +700,46 @@ function toDataUrl(file) {
   return `data:${mime};base64,${body}`;
 }
 
+function normalizeAccount(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isValidAccount(account) {
+  return /^[a-z0-9][a-z0-9_.@-]{3,39}$/.test(String(account || ""));
+}
+
+function validatePassword(password) {
+  const raw = String(password || "");
+  if (raw.length < PASSWORD_MIN_LEN) {
+    return `密码至少 ${PASSWORD_MIN_LEN} 位`;
+  }
+  if (raw.length > PASSWORD_MAX_LEN) {
+    return `密码最多 ${PASSWORD_MAX_LEN} 位`;
+  }
+  return "";
+}
+
+function hashPassword(password, salt) {
+  return crypto
+    .pbkdf2Sync(password, salt, PASSWORD_PBKDF2_ITERATIONS, 64, "sha512")
+    .toString("hex");
+}
+
+function verifyPassword(password, salt, hashHex) {
+  const expected = Buffer.from(String(hashHex || ""), "hex");
+  const actual = Buffer.from(hashPassword(password, salt), "hex");
+  if (expected.length !== actual.length || expected.length === 0) {
+    return false;
+  }
+  return crypto.timingSafeEqual(expected, actual);
+}
+
+function sanitizeNickname(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  return text.replace(/\s+/g, " ").slice(0, 20);
+}
+
 function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -609,6 +754,13 @@ function generateEmailCode() {
 
 function buildNicknameFromEmail(email) {
   const local = String(email || "").split("@")[0] || "用户";
+  const safe = local.replace(/[^\w\u4e00-\u9fa5.-]/g, "");
+  return safe ? `用户${safe.slice(0, 12)}` : "用户";
+}
+
+function buildNicknameFromAccount(account) {
+  const raw = String(account || "").trim();
+  const local = raw.split("@")[0] || raw || "用户";
   const safe = local.replace(/[^\w\u4e00-\u9fa5.-]/g, "");
   return safe ? `用户${safe.slice(0, 12)}` : "用户";
 }
